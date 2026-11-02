@@ -1,27 +1,47 @@
+using Game.CameraSystem;
 using Game.Combat;
 using UnityEngine;
 
 namespace Game.Gravity
 {
     /// <summary>
-    /// 摔伤：被重力甩出去、撞到地面/天花板/墙时扣血。
-    /// 连段越高，伤害越高（由 GravityAffected.ChainCount 提供）。
+    /// 摔伤：被重力甩出去撞到地面 / 天花板 / 墙时扣血并震屏。
+    /// 分方向判定：撞天花板（往上摔）的速度阈值更低，因为上升本来就慢。
     /// </summary>
     public class ImpactDamage : MonoBehaviour
     {
-        [Tooltip("低于这个撞击速度不受伤")]
-        [SerializeField] private float minImpactSpeed = 6f;
+        [Header("阈值")]
+        [Tooltip("向下撞（地面、墙）的最低速度")]
+        [SerializeField] private float minDownImpactSpeed = 6f;
 
+        [Tooltip("向上撞（天花板）的最低速度——反重力最高速通常只有 5，所以要更低")]
+        [SerializeField] private float minUpImpactSpeed = 3.2f;
+
+        [Header("伤害")]
         [SerializeField] private int baseDamage = 1;
 
         [Tooltip("每超出 1 单位速度，伤害 +1/damagePerSpeed")]
         [SerializeField] private float damagePerSpeed = 6f;
+
+        [Tooltip("撞天花板时的伤害倍率（通常比砸地轻）")]
+        [Range(0.1f, 1f)]
+        [SerializeField] private float ceilingDamageMultiplier = 0.7f;
 
         [Tooltip("每多一段连击，摔伤乘 (1 + ChainDamageBonus × (段数-1))")]
         [SerializeField] private float chainDamageBonus = 0.5f;
 
         [Tooltip("两次摔伤之间的最短间隔，防止一次碰撞触发多次")]
         [SerializeField] private float cooldown = 0.2f;
+
+        [Header("受击反馈")]
+        [Tooltip("震屏基础强度")]
+        [SerializeField] private float hitShake = 0.25f;
+
+        [Tooltip("每点伤害额外增加的震屏强度")]
+        [SerializeField] private float shakePerDamage = 0.1f;
+
+        [Tooltip("撞天花板时的额外震屏（哪怕没掉血也给个反馈，可以设 0 关掉）")]
+        [SerializeField] private float ceilingShake = 0.25f;
 
         private IDamageable damageable;
         private GravityAffected gravityAffected;
@@ -43,23 +63,44 @@ namespace Game.Gravity
 
         private void OnCollisionEnter2D(Collision2D collision)
         {
-            if (damageable == null || damageable.IsDead || damageable.IsInvincible) return;
+            if (damageable == null || damageable.IsDead) return;
             if (cooldownTimer > 0f) return;
 
             float speed = collision.relativeVelocity.magnitude;
-            if (speed < minImpactSpeed) return;
+            bool isCeiling = collision.contactCount > 0 && collision.GetContact(0).normal.y < -0.5f;
 
-            float baseAmount = baseDamage + (speed - minImpactSpeed) / Mathf.Max(0.01f, damagePerSpeed);
+            float threshold = isCeiling ? minUpImpactSpeed : minDownImpactSpeed;
+            bool overThreshold = speed >= threshold;
+
+            // 撞天花板即使没到伤害阈值，也给一点震动反馈
+            if (isCeiling && !overThreshold && ceilingShake > 0f)
+            {
+                Shake(ceilingShake * Mathf.Clamp01(speed / Mathf.Max(0.01f, threshold)));
+            }
+
+            if (!overThreshold) return;
+            if (damageable.IsInvincible) return;
+
+            float amount = baseDamage + (speed - threshold) / Mathf.Max(0.01f, damagePerSpeed);
+            if (isCeiling) amount *= ceilingDamageMultiplier;
 
             float chain = 1f;
             if (gravityAffected != null && gravityAffected.ChainCount > 1)
                 chain = 1f + chainDamageBonus * (gravityAffected.ChainCount - 1);
 
-            int damage = Mathf.Max(1, Mathf.RoundToInt(baseAmount * chain));
+            int damage = Mathf.Max(1, Mathf.RoundToInt(amount * chain));
             cooldownTimer = cooldown;
 
             DamageInfo info = new DamageInfo(damage, Vector2.zero, gameObject);
             damageable.TakeDamage(in info);
+
+            Shake(hitShake + shakePerDamage * damage);
+        }
+
+        private static void Shake(float amount)
+        {
+            CameraFollow cam = CameraFollow.Instance;
+            if (cam != null) cam.Shake(Mathf.Clamp01(amount));
         }
     }
 }

@@ -1,12 +1,13 @@
 using System.Collections;
+using Game.CameraSystem;
 using Game.Combat;
 using UnityEngine;
 
 namespace Game.Player
 {
     /// <summary>
-    /// 玩家的受击逻辑：无敌帧（冲刺 / 受击后）、击退、闪烁、死亡。
-    /// 血量数字本身存在 Health 组件里，这里只负责"允不允许掉"和"掉完怎么表现"。
+    /// 玩家的受击逻辑：无敌帧（冲刺 / 受击后）、击退、闪烁、震屏、死亡。
+    /// 血量数字本身存在 Health 组件里。
     /// </summary>
     [RequireComponent(typeof(PlayerMotor2D))]
     public class PlayerHealth : MonoBehaviour, IDamageable
@@ -16,6 +17,9 @@ namespace Game.Player
         [SerializeField] private Health health;
         [SerializeField] private SpriteRenderer spriteRenderer;
         [SerializeField] private bool showDebugHud = true;
+
+        [Tooltip("受击时镜头震动的基础强度")]
+        [SerializeField] private float hitShake = 0.5f;
 
         private float invincibleTimer;
         private Coroutine flashRoutine;
@@ -45,6 +49,8 @@ namespace Game.Player
 
             if (health != null) health.TakeDamage(info);
 
+            ShakeCamera(info.Amount);
+
             // 击退方向：背离伤害源
             float dir = -1f;
             if (info.Source != null)
@@ -59,6 +65,13 @@ namespace Game.Player
 
             invincibleTimer = config != null ? config.hurtInvincibleTime : 0.8f;
             StartFlash();
+        }
+
+        private void ShakeCamera(int damage)
+        {
+            CameraFollow cam = CameraFollow.Instance;
+            if (cam == null) return;
+            cam.Shake(Mathf.Clamp01(hitShake + 0.08f * Mathf.Abs(damage)));
         }
 
         private void StartFlash()

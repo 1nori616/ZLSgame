@@ -1,3 +1,4 @@
+using Game.Combat;
 using Game.Gravity;
 using UnityEngine;
 
@@ -9,8 +10,8 @@ namespace Game.Player
     ///   E = 对目标施放加重（往下砸，会打断漂浮）
     ///   R = 对自己施放反重力（反重力跳 / 滞空）
     ///
-    /// 目标选择：优先"锁定目标"，失效后才在身前搜索。
-    /// 施放成功时会让相机聚焦到目标身上一小段时间。
+    /// 目标选择：优先"锁定目标"，否则在以玩家为中心的圆内搜索，
+    /// 朝向前方的目标权重更高（前后都能选中，避免敌人绕背后就打不到）。
     /// </summary>
     public class GravityShift : MonoBehaviour
     {
@@ -134,23 +135,42 @@ namespace Game.Player
             return FindTarget();
         }
 
+        /// <summary>圆内搜索，朝向方向的目标评分更低（更容易选中）。</summary>
         private GravityAffected FindTarget()
         {
-            float facing = motor != null ? motor.Facing : 1f;
-            Vector2 center = (Vector2)transform.position
-                             + new Vector2(facing * config.castRange * 0.5f, config.castOffsetY);
-            Vector2 size = new Vector2(config.castRange, config.castHeight);
+            if (config == null) return null;
 
-            Collider2D[] hits = Physics2D.OverlapBoxAll(center, size, 0f, config.castLayer);
+            Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, config.castRadius, config.castLayer);
+            float facing = motor != null ? motor.Facing : 1f;
+
+            GravityAffected best = null;
+            float bestScore = float.MaxValue;
+
             for (int i = 0; i < hits.Length; i++)
             {
                 if (hits[i].transform.IsChildOf(transform)) continue;
 
-                GravityAffected target = hits[i].GetComponentInParent<GravityAffected>();
-                if (target != null && !target.transform.IsChildOf(transform)) return target;
+                GravityAffected candidate = hits[i].GetComponentInParent<GravityAffected>();
+                if (candidate == null || candidate.transform.IsChildOf(transform)) continue;
+                if (!candidate.IsValidTarget) continue;
+
+                Health hp = candidate.GetComponent<Health>();
+                if (hp != null && hp.IsDead) continue;
+
+                Vector2 delta = (Vector2)candidate.transform.position - (Vector2)transform.position;
+                float distance = delta.magnitude;
+
+                bool inFront = Mathf.Abs(delta.x) < 0.2f || Mathf.Sign(delta.x) == Mathf.Sign(facing);
+                float score = distance * (inFront ? config.frontPreference : 1f);
+
+                if (score < bestScore)
+                {
+                    bestScore = score;
+                    best = candidate;
+                }
             }
 
-            return null;
+            return best;
         }
 
         private void OnGUI()
@@ -165,7 +185,7 @@ namespace Game.Player
             if (lockedTarget != null)
                 text += $"  [锁定: {lockedTarget.name} x{lockedTarget.ChainCount}]";
 
-            GUILayout.BeginArea(new Rect(12f, 46f, 420f, 50f));
+            GUILayout.BeginArea(new Rect(12f, 46f, 460f, 50f));
             GUILayout.Label(text);
             GUILayout.EndArea();
         }
