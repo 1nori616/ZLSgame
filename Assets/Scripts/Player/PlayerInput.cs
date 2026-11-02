@@ -12,11 +12,17 @@ namespace Game.Player
         public bool JumpDown;  // 本帧刚按下
         public bool JumpHeld;  // 持续按住
         public bool DashDown;  // 本帧刚按下冲刺
+        public bool AntiDown;  // 本帧刚按下：反重力
+        public bool HeavyDown; // 本帧刚按下：加重
+        public bool SelfDown;  // 本帧刚按下：对自己施放
     }
 
     public class PlayerInput : MonoBehaviour
     {
         [SerializeField] private KeyCode dashKey = KeyCode.LeftShift;
+        [SerializeField] private KeyCode antiGravityKey = KeyCode.Q;
+        [SerializeField] private KeyCode heavyGravityKey = KeyCode.E;
+        [SerializeField] private KeyCode selfGravityKey = KeyCode.R;
 
         public PlayerInputData Read()
         {
@@ -26,6 +32,9 @@ namespace Game.Player
                 JumpDown = Input.GetButtonDown("Jump"),           // 空格
                 JumpHeld = Input.GetButton("Jump"),
                 DashDown = Input.GetKeyDown(dashKey),
+                AntiDown = Input.GetKeyDown(antiGravityKey),
+                HeavyDown = Input.GetKeyDown(heavyGravityKey),
+                SelfDown = Input.GetKeyDown(selfGravityKey),
             };
         }
     }

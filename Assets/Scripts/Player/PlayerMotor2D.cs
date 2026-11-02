@@ -22,8 +22,16 @@ namespace Game.Player
         private float dashDirection = 1f;
         private float facing = 1f;
 
+        private float knockbackTimer;
+
+        private float gravityOverrideTimer;
+        private float gravityOverrideAccel;
+        private float gravityOverrideMaxSpeed;
+
         public bool IsGrounded { get; private set; }
         public bool IsDashing => dashTimer > 0f;
+        public bool IsKnockedBack => knockbackTimer > 0f;
+        public bool IsGravityOverridden => gravityOverrideTimer > 0f;
         public bool CanDash => dashCooldownTimer <= 0f && !IsDashing;
         public float VerticalVelocity => rb != null ? rb.velocity.y : 0f;
         public float HorizontalSpeed => rb != null ? Mathf.Abs(rb.velocity.x) : 0f;
@@ -49,6 +57,8 @@ namespace Game.Player
             UpdateGroundCheck();
 
             if (dashCooldownTimer > 0f) dashCooldownTimer -= Time.fixedDeltaTime;
+            if (knockbackTimer > 0f) knockbackTimer -= Time.fixedDeltaTime;
+            if (gravityOverrideTimer > 0f) gravityOverrideTimer -= Time.fixedDeltaTime;
 
             if (dashTimer > 0f)
             {
@@ -57,18 +67,20 @@ namespace Game.Player
 
                 if (dashTimer <= 0f)
                 {
-                    // 冲刺结束时保留一半横向速度，避免突然刹停
                     rb.velocity = new Vector2(rb.velocity.x * 0.5f, rb.velocity.y);
                 }
                 return;
             }
 
-            ApplyGravityFeel();
-            ApplyHorizontal(targetHorizontal);
+            if (IsGravityOverridden) ApplyGravityRamp();
+            else ApplyGravityFeel();
+
+            // 被击退期间不响应输入，让物理把人推走
+            if (knockbackTimer <= 0f) ApplyHorizontal(targetHorizontal);
 
             if (jumpPending)
             {
-                if (IsGrounded)
+                if (IsGrounded && knockbackTimer <= 0f)
                 {
                     rb.velocity = new Vector2(rb.velocity.x, pendingJumpForce);
                 }
@@ -83,6 +95,19 @@ namespace Game.Player
                 ? config.gravityScale * config.fallGravityMultiplier
                 : config.gravityScale;
             rb.gravityScale = scale;
+        }
+
+        /// <summary>重力操控期间：关掉重力，按匀加速线性改变纵向速度（由慢到快）。</summary>
+        private void ApplyGravityRamp()
+        {
+            rb.gravityScale = 0f;
+
+            float vy = Mathf.Clamp(
+                rb.velocity.y + gravityOverrideAccel * Time.fixedDeltaTime,
+                -gravityOverrideMaxSpeed,
+                gravityOverrideMaxSpeed);
+
+            rb.velocity = new Vector2(rb.velocity.x, vy);
         }
 
         private void ApplyHorizontal(float input)
@@ -125,7 +150,6 @@ namespace Game.Player
             pendingJumpForce = force;
         }
 
-        /// <summary>松开跳跃键时截断上升速度，实现"短按小跳、长按大跳"。</summary>
         public void CutJump()
         {
             if (rb == null || rb.velocity.y <= 0f) return;
@@ -140,6 +164,31 @@ namespace Game.Player
             facing = dashDirection;
             dashTimer = config.dashDuration;
             dashCooldownTimer = config.dashCooldown;
+        }
+
+        public void ApplyKnockback(Vector2 velocity, float duration)
+        {
+            if (rb == null) return;
+            rb.velocity = velocity;
+            knockbackTimer = Mathf.Max(0.01f, duration);
+
+            if (!Mathf.Approximately(velocity.x, 0f)) facing = -Mathf.Sign(velocity.x);
+        }
+
+        /// <summary>
+        /// 重力操控（对自己）：duration 秒内按"加速度 + 速度上限"线性升降，
+        /// 结束后自动恢复常规重力。
+        /// accel 为正 = 向上加速，为负 = 向下加速。
+        /// </summary>
+        public void ApplyGravityOverride(float acceleration, float maxSpeed, float duration)
+        {
+            if (rb == null) return;
+
+            gravityOverrideAccel = acceleration;
+            gravityOverrideMaxSpeed = Mathf.Abs(maxSpeed);
+            gravityOverrideTimer = Mathf.Max(0.01f, duration);
+            rb.gravityScale = 0f;
+            rb.WakeUp();
         }
     }
 }

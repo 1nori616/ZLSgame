@@ -10,31 +10,17 @@ namespace Game.Player
     public class PlayerConfig : ScriptableObject
     {
         [Header("水平移动")]
-        [Tooltip("最大水平速度")]
         public float moveSpeed = 7f;
-
-        [Tooltip("加速度：越大越跟手")]
         public float acceleration = 70f;
-
-        [Tooltip("松开方向键后的减速度")]
         public float deceleration = 90f;
 
         [Header("跳跃")]
         public float jumpForce = 13f;
-
-        [Tooltip("基础重力倍率")]
         public float gravityScale = 3.5f;
-
         [Tooltip("下落时的重力倍率，>1 会让人物落地更干脆")]
         public float fallGravityMultiplier = 1.6f;
-
-        [Tooltip("土狼时间：离开平台后仍可起跳的宽限")]
         public float coyoteTime = 0.1f;
-
-        [Tooltip("跳跃缓冲：落地前按跳也算数")]
         public float jumpBufferTime = 0.12f;
-
-        [Tooltip("上升中松开跳跃键时，纵向速度保留的比例")]
         public float jumpCutMultiplier = 0.5f;
 
         [Header("冲刺")]
@@ -42,15 +28,36 @@ namespace Game.Player
         public float dashDuration = 0.15f;
         public float dashCooldown = 0.5f;
 
+        [Header("重力操控")]
+        [Tooltip("重力影响持续时间（秒）")]
+        public float gravityDuration = 2f;
+
+        [Tooltip("最多攒几格充能")]
+        public int gravityCharges = 3;
+
+        [Tooltip("每恢复一格充能需要几秒")]
+        public float gravityRechargeTime = 1.2f;
+
+        [Header("对自己施放（R）")]
+        [Tooltip("反重力加速度：越大越快升空")]
+        public float selfAntiAcceleration = 16f;
+
+        [Tooltip("上升速度上限")]
+        public float selfAntiMaxSpeed = 6f;
+
+        [Header("施放判定")]
+        public float castRange = 2f;
+        public float castHeight = 1.5f;
+        public float castOffsetY = 0.5f;
+        public LayerMask castLayer = ~0;
+
+        [Header("受击")]
+        public float hurtInvincibleTime = 0.8f;
+        public float knockbackTime = 0.18f;
+
         [Header("接地检测")]
-        [Tooltip("哪些层算地面")]
         public LayerMask groundLayer = ~0;
-
-        [Tooltip("检测盒宽度相对于碰撞体宽度的比例")]
-        [Range(0.5f, 1f)]
-        public float groundCheckWidthScale = 0.9f;
-
-        [Tooltip("检测盒相对脚底向下的距离")]
+        [Range(0.5f, 1f)] public float groundCheckWidthScale = 0.9f;
         public float groundCheckDistance = 0.06f;
     }
 }
