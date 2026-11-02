@@ -338,7 +338,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: -4, z: 0}
-  m_LocalScale: {x: 20, y: 1, z: 1}
+  m_LocalScale: {x: 120, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -601,6 +601,7 @@ MonoBehaviour:
   input: {fileID: 0}
   motor: {fileID: 0}
   config: {fileID: 0}
+  cameraFollow: {fileID: 0}
   targetLockExtra: 0.5
 --- !u!1 &1687372287
 GameObject:
@@ -727,7 +728,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 4, z: 0}
-  m_LocalScale: {x: 20, y: 1, z: 1}
+  m_LocalScale: {x: 120, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -842,6 +843,8 @@ MonoBehaviour:
   smoothTime: 0.12
   lookAheadX: 1.5
   lookAheadSmooth: 2
+  focusZoomOut: 1.5
+  focusBlend: 6
 --- !u!1 &1778766605
 GameObject:
   m_ObjectHideFlags: 0
@@ -895,6 +898,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   baseGravityScale: 1
   chainWindow: 2.5
+  antiAcceleration: 14
+  antiMaxSpeed: 5
+  heavyAcceleration: 45
+  heavyMaxSpeed: 24
 --- !u!114 &1778766608
 MonoBehaviour:
   m_ObjectHideFlags: 0

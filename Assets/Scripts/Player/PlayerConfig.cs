@@ -38,6 +38,9 @@ namespace Game.Player
         [Tooltip("每恢复一格充能需要几秒")]
         public float gravityRechargeTime = 1.2f;
 
+        [Tooltip("施放时镜头聚焦的时长（秒）")]
+        public float cameraFocusDuration = 0.8f;
+
         [Header("对自己施放（R）")]
         [Tooltip("反重力加速度：越大越快升空")]
         public float selfAntiAcceleration = 16f;

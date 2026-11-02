@@ -9,13 +9,17 @@ namespace Game.Player
     ///   E = 对目标施放加重（往下砸，会打断漂浮）
     ///   R = 对自己施放反重力（反重力跳 / 滞空）
     ///
-    /// 目标选择：优先"锁定目标"（上一次施放的对象），目标失效后才重新在身前搜索。
+    /// 目标选择：优先"锁定目标"，失效后才在身前搜索。
+    /// 施放成功时会让相机聚焦到目标身上一小段时间。
     /// </summary>
     public class GravityShift : MonoBehaviour
     {
         [SerializeField] private PlayerInput input;
         [SerializeField] private PlayerMotor2D motor;
         [SerializeField] private PlayerConfig config;
+
+        [Tooltip("留空会自动找 Camera.main 上的 CameraFollow")]
+        [SerializeField] private Game.CameraSystem.CameraFollow cameraFollow;
 
         [Tooltip("锁定目标在重力持续时间之外还能保留多久（秒）")]
         [SerializeField] private float targetLockExtra = 0.5f;
@@ -38,6 +42,9 @@ namespace Game.Player
             if (motor == null) motor = GetComponent<PlayerMotor2D>();
             if (config == null && motor != null) config = motor.Config;
             if (config != null) charges = config.gravityCharges;
+
+            if (cameraFollow == null && Camera.main != null)
+                cameraFollow = Camera.main.GetComponent<Game.CameraSystem.CameraFollow>();
         }
 
         private void Update()
@@ -99,6 +106,8 @@ namespace Game.Player
 
             lockedTarget = target;
             lockTimer = config.gravityDuration + targetLockExtra;
+
+            FocusCamera(target.transform);
             return true;
         }
 
@@ -109,6 +118,12 @@ namespace Game.Player
             motor.ApplyGravityOverride(config.selfAntiAcceleration, config.selfAntiMaxSpeed, config.gravityDuration);
             ConsumeCharge();
             return true;
+        }
+
+        private void FocusCamera(Transform targetTransform)
+        {
+            if (cameraFollow == null) return;
+            cameraFollow.FocusOn(targetTransform, config.cameraFocusDuration);
         }
 
         private GravityAffected ResolveTarget()

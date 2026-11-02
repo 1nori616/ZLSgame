@@ -24,6 +24,20 @@ MonoBehaviour:
   dashSpeed: 18
   dashDuration: 0.15
   dashCooldown: 0.5
+  gravityDuration: 2
+  gravityCharges: 3
+  gravityRechargeTime: 1.2
+  cameraFocusDuration: 1.2
+  selfAntiAcceleration: 16
+  selfAntiMaxSpeed: 6
+  castRange: 2
+  castHeight: 1.5
+  castOffsetY: 0.5
+  castLayer:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  hurtInvincibleTime: 0.8
+  knockbackTime: 0.18
   groundLayer:
     serializedVersion: 2
     m_Bits: 4294967295
