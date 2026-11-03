@@ -5,7 +5,7 @@ namespace Game.Gravity
 {
     /// <summary>
     /// 挂在"可以被改重力"的物体上：敌人、箱子、石块。
-    /// 施放时进入"匀加速"模式；同时检测是否站在地面，供"落地重压"反馈使用。
+    /// 施放时进入"匀加速"模式；同时检测是否站在地面（跟随世界重力方向）。
     /// </summary>
     [RequireComponent(typeof(Rigidbody2D))]
     public class GravityAffected : MonoBehaviour
@@ -17,17 +17,11 @@ namespace Game.Gravity
         [SerializeField] private float chainWindow = 2.5f;
 
         [Header("反重力（往上飘）")]
-        [Tooltip("加速度：越大越快达到最高速")]
         [SerializeField] private float antiAcceleration = 14f;
-
-        [Tooltip("上升速度上限")]
         [SerializeField] private float antiMaxSpeed = 5f;
 
         [Header("加重（往下砸）")]
-        [Tooltip("加速度：越大砸得越猛")]
         [SerializeField] private float heavyAcceleration = 45f;
-
-        [Tooltip("下坠速度上限")]
         [SerializeField] private float heavyMaxSpeed = 24f;
 
         [Header("接地检测")]
@@ -51,7 +45,9 @@ namespace Game.Gravity
         public float ChainWindow => chainWindow;
         public bool IsValidTarget => this != null && isActiveAndEnabled;
 
-        /// <summary>站在地面上被"加重"时触发：给"被压下去"的专属反馈。</summary>
+        private int Sign => GravityWorld.Instance != null ? GravityWorld.Instance.Sign : 1;
+
+        /// <summary>站在地面（相对当前重力方向）时被"加重"，触发"被压住"的反馈。</summary>
         public event Action<GravityAffected> OnGroundSlam;
 
         private void Awake()
@@ -82,8 +78,13 @@ namespace Game.Gravity
         {
             if (body == null) { IsGrounded = false; return; }
 
+            int sign = Sign;
             Bounds b = body.bounds;
-            Vector2 center = new Vector2(b.center.x, b.min.y - groundCheckDistance);
+            float probeY = sign > 0
+                ? b.min.y - groundCheckDistance
+                : b.max.y + groundCheckDistance;
+
+            Vector2 center = new Vector2(b.center.x, probeY);
             Vector2 size = new Vector2(b.size.x * groundCheckWidthScale, groundCheckDistance * 2f);
 
             IsGrounded = false;
@@ -102,7 +103,8 @@ namespace Game.Gravity
 
             rb.gravityScale = 0f;
 
-            float accel = LastMode == GravityMode.AntiGravity ? antiAcceleration : -heavyAcceleration;
+            int sign = Sign;
+            float accel = (LastMode == GravityMode.AntiGravity ? antiAcceleration : -heavyAcceleration) * sign;
             float maxSpeed = LastMode == GravityMode.AntiGravity ? antiMaxSpeed : heavyMaxSpeed;
 
             float vy = Mathf.Clamp(rb.velocity.y + accel * Time.fixedDeltaTime, -maxSpeed, maxSpeed);
@@ -121,7 +123,6 @@ namespace Game.Gravity
             rb.gravityScale = 0f;
             rb.WakeUp();
 
-            // 站在地上又被加重：触发"被压住"的专属反馈
             if (mode == GravityMode.Heavy && IsGrounded)
                 OnGroundSlam?.Invoke(this);
         }

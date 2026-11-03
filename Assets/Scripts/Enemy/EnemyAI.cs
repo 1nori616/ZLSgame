@@ -40,6 +40,9 @@ namespace Game.Enemy
         [Header("引用（留空自动找）")]
         [SerializeField] private SpriteRenderer spriteRenderer;
 
+        [Tooltip("素材朝向和代码相反时勾上")]
+        [SerializeField] private bool invertFacing;
+
         private Rigidbody2D rb;
         private GravityAffected gravity;
         private Health health;
@@ -110,7 +113,7 @@ namespace Game.Enemy
             if (inSight && !Mathf.Approximately(dx, 0f))
             {
                 facing = Mathf.Sign(dx);
-                if (spriteRenderer != null) spriteRenderer.flipX = facing < 0f;
+                if (spriteRenderer != null) spriteRenderer.flipX = (facing < 0f) ^ invertFacing;
             }
         }
 

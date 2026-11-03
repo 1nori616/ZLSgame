@@ -4,6 +4,7 @@ namespace Game.Player
 {
     /// <summary>
     /// 玩家所有可调数值。放在 ScriptableObject 里，策划改数值不用改代码。
+    /// 右键 Create > Game > Player Config 生成资产。
     /// </summary>
     [CreateAssetMenu(fileName = "PlayerConfig", menuName = "Game/Player Config")]
     public class PlayerConfig : ScriptableObject
@@ -39,6 +40,13 @@ namespace Game.Player
 
         [Tooltip("施放时镜头聚焦的时长（秒）")]
         public float cameraFocusDuration = 0.8f;
+
+        [Header("重力翻转（F）")]
+        [Tooltip("翻转一次持续多少秒")]
+        public float flipDuration = 10f;
+
+        [Tooltip("两次翻转之间的冷却")]
+        public float flipCooldown = 3f;
 
         [Header("对自己施放（R）")]
         public float selfAntiAcceleration = 16f;

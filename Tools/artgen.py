@@ -22,6 +22,28 @@ def save(img, w, h, path):
     img.save(path)
 
 
+def save_fit(img, w, h, path):
+    save(fit_canvas(img, w, h), w, h, path)
+
+
+def fit_canvas(img, w, h):
+    """裁掉透明边，再按高度撑满画布（宽度保持比例居中）。
+    这样角色正好"顶天立地"，配合中心枢轴和居中碰撞体，翻转/站立都不会悬空或下陷。"""
+    bbox = img.split()[3].getbbox()
+    if bbox is None:
+        return img
+
+    cropped = img.crop(bbox)
+    cw, ch = cropped.size
+    scale = (h * S) / ch
+    new_w = max(1, int(round(cw * scale)))
+    resized = cropped.resize((new_w, h * S), Image.NEAREST)
+
+    out = Image.new("RGBA", (w * S, h * S), (0, 0, 0, 0))
+    out.paste(resized, ((w * S - new_w) // 2, 0), resized)
+    return out
+
+
 # ---------------- 调色板 ----------------
 PAL = {
     "fur":      (74, 52, 40, 255),
@@ -154,24 +176,24 @@ def main():
     for i in range(4):
         img, d, w, h = canvas(64, 64)
         gorilla(d, w, h, i / 4, "idle")
-        save(img, 64, 64, os.path.join(out, f"Player_Idle_{i:02d}.png"))
+        save_fit(img, 64, 64, os.path.join(out, f"Player_Idle_{i:02d}.png"))
 
     # 主角 run 6 帧
     for i in range(6):
         img, d, w, h = canvas(64, 64)
         gorilla(d, w, h, i / 6, "run")
-        save(img, 64, 64, os.path.join(out, f"Player_Run_{i:02d}.png"))
+        save_fit(img, 64, 64, os.path.join(out, f"Player_Run_{i:02d}.png"))
 
     # 跳跃 / 下落
     for name, pose in (("Jump", "jump"), ("Fall", "fall")):
         img, d, w, h = canvas(64, 64)
         gorilla(d, w, h, 0, pose)
-        save(img, 64, 64, os.path.join(out, f"Player_{name}_00.png"))
+        save_fit(img, 64, 64, os.path.join(out, f"Player_{name}_00.png"))
 
     # 敌人
     img, d, w, h = canvas(64, 64)
     enemy(d, w, h)
-    save(img, 64, 64, os.path.join(out, "Enemy_Walk_00.png"))
+    save_fit(img, 64, 64, os.path.join(out, "Enemy_Walk_00.png"))
 
     # 道具
     img, d, w, h = canvas(32, 32)

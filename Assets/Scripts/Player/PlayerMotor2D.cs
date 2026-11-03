@@ -1,10 +1,11 @@
+using Game.Gravity;
 using UnityEngine;
 
 namespace Game.Player
 {
     /// <summary>
     /// 只负责"让身体动起来"：水平速度、重力、跳跃、冲刺、接地检测。
-    /// 不读输入、不碰动画、不管游戏逻辑。
+    /// 支持房间级重力翻转（GravityWorld），翻转后"下"变成 +Y。
     /// </summary>
     [RequireComponent(typeof(Rigidbody2D))]
     public class PlayerMotor2D : MonoBehaviour
@@ -38,6 +39,9 @@ namespace Game.Player
         public float Facing => facing;
         public PlayerConfig Config => config;
 
+        /// <summary>当前重力方向：+1 正常，-1 翻转。</summary>
+        public int GravitySign => GravityWorld.Instance != null ? GravityWorld.Instance.Sign : 1;
+
         private void Awake()
         {
             rb = GetComponent<Rigidbody2D>();
@@ -54,7 +58,9 @@ namespace Game.Player
         {
             if (config == null || rb == null) return;
 
-            UpdateGroundCheck();
+            int sign = GravitySign;
+
+            UpdateGroundCheck(sign);
 
             if (dashCooldownTimer > 0f) dashCooldownTimer -= Time.fixedDeltaTime;
             if (knockbackTimer > 0f) knockbackTimer -= Time.fixedDeltaTime;
@@ -72,38 +78,38 @@ namespace Game.Player
                 return;
             }
 
-            if (IsGravityOverridden) ApplyGravityRamp();
-            else ApplyGravityFeel();
+            if (IsGravityOverridden) ApplyGravityRamp(sign);
+            else ApplyGravityFeel(sign);
 
-            // 被击退期间不响应输入，让物理把人推走
             if (knockbackTimer <= 0f) ApplyHorizontal(targetHorizontal);
 
             if (jumpPending)
             {
                 if (IsGrounded && knockbackTimer <= 0f)
                 {
-                    rb.velocity = new Vector2(rb.velocity.x, pendingJumpForce);
+                    // 翻转后，跳跃方向也要跟着反
+                    rb.velocity = new Vector2(rb.velocity.x, pendingJumpForce * sign);
                 }
                 jumpPending = false;
             }
         }
 
-        /// <summary>下落时加重力，上升时正常，这是"脆"手感的来源之一。</summary>
-        private void ApplyGravityFeel()
+        private void ApplyGravityFeel(int sign)
         {
-            float scale = rb.velocity.y < 0f
+            bool falling = rb.velocity.y * sign < 0f;
+            float scale = falling
                 ? config.gravityScale * config.fallGravityMultiplier
                 : config.gravityScale;
             rb.gravityScale = scale;
         }
 
-        /// <summary>重力操控期间：关掉重力，按匀加速线性改变纵向速度（由慢到快）。</summary>
-        private void ApplyGravityRamp()
+        private void ApplyGravityRamp(int sign)
         {
             rb.gravityScale = 0f;
 
+            float accel = gravityOverrideAccel * sign;
             float vy = Mathf.Clamp(
-                rb.velocity.y + gravityOverrideAccel * Time.fixedDeltaTime,
+                rb.velocity.y + accel * Time.fixedDeltaTime,
                 -gravityOverrideMaxSpeed,
                 gravityOverrideMaxSpeed);
 
@@ -120,12 +126,16 @@ namespace Game.Player
             if (!Mathf.Approximately(input, 0f)) facing = Mathf.Sign(input);
         }
 
-        private void UpdateGroundCheck()
+        private void UpdateGroundCheck(int sign)
         {
             if (body == null) { IsGrounded = false; return; }
 
             Bounds b = body.bounds;
-            Vector2 center = new Vector2(b.center.x, b.min.y - config.groundCheckDistance);
+            float probeY = sign > 0
+                ? b.min.y - config.groundCheckDistance
+                : b.max.y + config.groundCheckDistance;
+
+            Vector2 center = new Vector2(b.center.x, probeY);
             Vector2 size = new Vector2(b.size.x * config.groundCheckWidthScale, config.groundCheckDistance * 2f);
 
             IsGrounded = false;
@@ -152,7 +162,8 @@ namespace Game.Player
 
         public void CutJump()
         {
-            if (rb == null || rb.velocity.y <= 0f) return;
+            int sign = GravitySign;
+            if (rb == null || rb.velocity.y * sign <= 0f) return;
             rb.velocity = new Vector2(rb.velocity.x, rb.velocity.y * config.jumpCutMultiplier);
         }
 
@@ -175,11 +186,6 @@ namespace Game.Player
             if (!Mathf.Approximately(velocity.x, 0f)) facing = -Mathf.Sign(velocity.x);
         }
 
-        /// <summary>
-        /// 重力操控（对自己）：duration 秒内按"加速度 + 速度上限"线性升降，
-        /// 结束后自动恢复常规重力。
-        /// accel 为正 = 向上加速，为负 = 向下加速。
-        /// </summary>
         public void ApplyGravityOverride(float acceleration, float maxSpeed, float duration)
         {
             if (rb == null) return;

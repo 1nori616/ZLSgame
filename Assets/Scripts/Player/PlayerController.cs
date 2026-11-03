@@ -14,6 +14,12 @@ namespace Game.Player
         [SerializeField] private PlayerConfig config;
         [SerializeField] private Animator animator;
 
+        [Tooltip("留空会自动找子物体上的 SpriteRenderer")]
+        [SerializeField] private SpriteRenderer spriteRenderer;
+
+        [Tooltip("素材朝向和代码相反时勾上")]
+        [SerializeField] private bool invertFacing;
+
         private float coyoteTimer;
         private float bufferTimer;
         private bool jumpHeldLastFrame;
@@ -29,6 +35,7 @@ namespace Game.Player
             if (motor == null) motor = GetComponent<PlayerMotor2D>();
             if (config == null && motor != null) config = motor.Config;
             if (animator == null) animator = GetComponentInChildren<Animator>();
+            if (spriteRenderer == null) spriteRenderer = GetComponentInChildren<SpriteRenderer>();
         }
 
         private void Update()
@@ -65,6 +72,10 @@ namespace Game.Player
 
         private void UpdateAnimator()
         {
+            // 按朝向翻转贴图（invertFacing 用于素材方向相反的情况）
+            if (spriteRenderer != null)
+                spriteRenderer.flipX = (motor.Facing < 0f) ^ invertFacing;
+
             if (animator == null) return;
 
             animator.SetFloat(SpeedHash, motor.HorizontalSpeed);
