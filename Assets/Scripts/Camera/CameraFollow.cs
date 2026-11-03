@@ -3,11 +3,13 @@ using UnityEngine;
 namespace Game.CameraSystem
 {
     /// <summary>
-    /// 横板跟随摄像机：平滑跟随 + 朝向预判 + 技能聚焦。
-    /// 平时跟玩家；调用 FocusOn() 后，镜头移到"玩家与目标的中点"并拉远，时间到自动回位。
+    /// 横板跟随摄像机：平滑跟随 + 朝向预判 + 技能聚焦 + 受击震屏。
+    /// 相机位置的唯一拥有者——其它系统只能调用 Shake()，不要直接改 transform。
     /// </summary>
     public class CameraFollow : MonoBehaviour
     {
+        public static CameraFollow Instance { get; private set; }
+
         [SerializeField] private Transform target;
         [SerializeField] private Vector3 offset = new Vector3(0f, 1.5f, -10f);
         [SerializeField] private float smoothTime = 0.12f;
@@ -20,22 +22,35 @@ namespace Game.CameraSystem
         [Header("技能聚焦")]
         [Tooltip("聚焦时正交尺寸增加多少（越大拉得越远）")]
         [SerializeField] private float focusZoomOut = 1.5f;
-
-        [Tooltip("聚焦过渡速度")]
         [SerializeField] private float focusBlend = 6f;
 
+        [Header("受击震屏")]
+        [Tooltip("最大抖动位移（世界单位）")]
+        [SerializeField] private float maxShakeOffset = 0.35f;
+
+        [Tooltip("创伤值每秒衰减多少，越大平息越快")]
+        [SerializeField] private float shakeDecay = 2.6f;
+
+        private Vector3 followPosition;
         private Vector3 velocity;
         private float currentLookAhead;
+
         private Camera cam;
         private float baseSize;
         private Transform focusTarget;
         private float focusTimer;
 
+        private float trauma;
+
         public Transform FocusTarget => focusTarget;
         public bool IsFocusing => focusTarget != null && focusTimer > 0f;
+        public float Trauma => trauma;
 
         private void Awake()
         {
+            Instance = this;
+            followPosition = transform.position;
+
             cam = GetComponent<Camera>();
             if (cam != null) baseSize = cam.orthographicSize;
 
@@ -46,7 +61,17 @@ namespace Game.CameraSystem
             }
         }
 
-        /// <summary>聚焦到某个目标：镜头移到两者中点并拉远，duration 秒后回位。</summary>
+        private void OnDestroy()
+        {
+            if (Instance == this) Instance = null;
+        }
+
+        /// <summary>触发震屏。amount 0~1，多次调用会叠加（有上限）。</summary>
+        public void Shake(float amount)
+        {
+            trauma = Mathf.Clamp(trauma + amount, 0f, 1f);
+        }
+
         public void FocusOn(Transform focus, float duration)
         {
             if (focus == null) return;
@@ -84,13 +109,20 @@ namespace Game.CameraSystem
                 desired = target.position + offset + new Vector3(currentLookAhead, 0f, 0f);
             }
 
-            transform.position = Vector3.SmoothDamp(transform.position, desired, ref velocity, smoothTime);
+            // 跟随只动"逻辑位置"，抖动单独叠加，避免抖动被平滑进跟随里
+            followPosition = Vector3.SmoothDamp(followPosition, desired, ref velocity, smoothTime);
 
             if (cam != null && cam.orthographic)
             {
                 float targetSize = baseSize + (IsFocusing ? focusZoomOut : 0f);
                 cam.orthographicSize = Mathf.Lerp(cam.orthographicSize, targetSize, focusBlend * Time.deltaTime);
             }
+
+            trauma = Mathf.Max(0f, trauma - shakeDecay * Time.deltaTime);
+            float shake = trauma * trauma;
+            Vector2 jitter = Random.insideUnitCircle * (maxShakeOffset * shake);
+
+            transform.position = followPosition + new Vector3(jitter.x, jitter.y, 0f);
         }
     }
 }

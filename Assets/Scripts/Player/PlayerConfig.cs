@@ -4,7 +4,6 @@ namespace Game.Player
 {
     /// <summary>
     /// 玩家所有可调数值。放在 ScriptableObject 里，策划改数值不用改代码。
-    /// 右键 Create > Game > Player Config 生成资产。
     /// </summary>
     [CreateAssetMenu(fileName = "PlayerConfig", menuName = "Game/Player Config")]
     public class PlayerConfig : ScriptableObject
@@ -42,20 +41,22 @@ namespace Game.Player
         public float cameraFocusDuration = 0.8f;
 
         [Header("对自己施放（R）")]
-        [Tooltip("反重力加速度：越大越快升空")]
         public float selfAntiAcceleration = 16f;
-
-        [Tooltip("上升速度上限")]
         public float selfAntiMaxSpeed = 6f;
 
         [Header("施放判定")]
-        public float castRange = 2f;
-        public float castHeight = 1.5f;
-        public float castOffsetY = 0.5f;
+        [Tooltip("以玩家为中心的搜索半径（前后都能选中）")]
+        public float castRadius = 3.5f;
+
+        [Tooltip("朝向前方的目标权重更高：距离 × 这个系数")]
+        [Range(0.2f, 1f)]
+        public float frontPreference = 0.6f;
+
+        [Tooltip("施放判定能命中的层")]
         public LayerMask castLayer = ~0;
 
         [Header("受击")]
-        public float hurtInvincibleTime = 0.8f;
+        public float hurtInvincibleTime = 0.5f;
         public float knockbackTime = 0.18f;
 
         [Header("接地检测")]
