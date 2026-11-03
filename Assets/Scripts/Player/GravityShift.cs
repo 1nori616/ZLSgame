@@ -4,7 +4,7 @@ using UnityEngine;
 namespace Game.Player
 {
     /// <summary>
-    /// 玩家的重力技能（充能制，可以连按）：
+    /// 玩家的重力技能（充能制，自动回复）：
     ///   Q = 对目标施放反重力（飘起）
     ///   E = 对目标施放加重（砸下，会打断漂浮）
     ///   R = 对自己施放反重力（反重力跳）
@@ -197,7 +197,7 @@ namespace Game.Player
             if (GravityWorld.Instance != null && GravityWorld.Instance.IsFlipped)
                 text += $"  [翻转中 {GravityWorld.Instance.RemainingTime:0.0}s]";
             else if (!CanFlip)
-                text += $"  [翻转冷却]";
+                text += "  [翻转冷却]";
 
             GUILayout.BeginArea(new Rect(12f, 46f, 520f, 50f));
             GUILayout.Label(text);

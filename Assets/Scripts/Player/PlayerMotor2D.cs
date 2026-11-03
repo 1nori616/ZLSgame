@@ -29,6 +29,7 @@ namespace Game.Player
         private float gravityOverrideAccel;
         private float gravityOverrideMaxSpeed;
 
+
         public bool IsGrounded { get; private set; }
         public bool IsDashing => dashTimer > 0f;
         public bool IsKnockedBack => knockbackTimer > 0f;
@@ -100,6 +101,8 @@ namespace Game.Player
             float scale = falling
                 ? config.gravityScale * config.fallGravityMultiplier
                 : config.gravityScale;
+
+
             rb.gravityScale = scale;
         }
 
@@ -185,6 +188,7 @@ namespace Game.Player
 
             if (!Mathf.Approximately(velocity.x, 0f)) facing = -Mathf.Sign(velocity.x);
         }
+
 
         public void ApplyGravityOverride(float acceleration, float maxSpeed, float duration)
         {
