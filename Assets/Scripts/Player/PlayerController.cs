@@ -78,6 +78,9 @@ namespace Game.Player
 
             if (animator == null) return;
 
+            // 动画控制器没配置参数时不要调用，否则每帧刷警告
+            if (animator.parameterCount == 0) return;
+
             animator.SetFloat(SpeedHash, motor.HorizontalSpeed);
             animator.SetBool(GroundedHash, motor.IsGrounded);
             animator.SetFloat(VerticalSpeedHash, motor.VerticalVelocity);

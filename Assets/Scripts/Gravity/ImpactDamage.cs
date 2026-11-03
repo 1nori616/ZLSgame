@@ -33,6 +33,9 @@ namespace Game.Gravity
         [Tooltip("两次摔伤之间的最短间隔，防止一次碰撞触发多次")]
         [SerializeField] private float cooldown = 0.2f;
 
+        [Tooltip("只有在被重力甩过之后这么多秒内，落地才算摔伤（自己跳下来不算）")]
+        [SerializeField] private float gravityGrace = 2.5f;
+
         [Header("受击反馈")]
         [Tooltip("震屏基础强度")]
         [SerializeField] private float hitShake = 0.25f;
@@ -66,6 +69,16 @@ namespace Game.Gravity
             if (damageable == null || damageable.IsDead) return;
             if (cooldownTimer > 0f) return;
 
+            // 只有"被重力甩过"的东西参与碰撞才算摔伤。
+            // 注意：判断双方——箱子砸敌人时，挨砸的敌人自己没被施放过。
+            GravityAffected otherGravity = collision.collider.GetComponent<GravityAffected>();
+            if (otherGravity == null) otherGravity = collision.collider.GetComponentInParent<GravityAffected>();
+
+            bool selfThrown = gravityAffected != null && gravityAffected.TimeSinceLastCast <= gravityGrace;
+            bool otherThrown = otherGravity != null && otherGravity.TimeSinceLastCast <= gravityGrace;
+
+            if (!selfThrown && !otherThrown) return;
+
             float speed = collision.relativeVelocity.magnitude;
             bool isCeiling = collision.contactCount > 0 && collision.GetContact(0).normal.y < -0.5f;
 
@@ -93,6 +106,9 @@ namespace Game.Gravity
 
             DamageInfo info = new DamageInfo(damage, Vector2.zero, gameObject);
             damageable.TakeDamage(in info);
+
+            if (Game.Effects.ComboCounter.Instance != null)
+                Game.Effects.ComboCounter.Instance.AddHit();
 
             Shake(hitShake + shakePerDamage * damage);
         }

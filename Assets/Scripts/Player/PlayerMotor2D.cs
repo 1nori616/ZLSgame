@@ -24,6 +24,7 @@ namespace Game.Player
         private float facing = 1f;
 
         private float knockbackTimer;
+        private float speedMultiplier = 1f;
 
         private float gravityOverrideTimer;
         private float gravityOverrideAccel;
@@ -121,7 +122,7 @@ namespace Game.Player
 
         private void ApplyHorizontal(float input)
         {
-            float targetSpeed = input * config.moveSpeed;
+            float targetSpeed = input * config.moveSpeed * speedMultiplier;
             float rate = Mathf.Approximately(input, 0f) ? config.deceleration : config.acceleration;
             float newX = Mathf.MoveTowards(rb.velocity.x, targetSpeed, rate * Time.fixedDeltaTime);
             rb.velocity = new Vector2(newX, rb.velocity.y);
@@ -189,6 +190,12 @@ namespace Game.Player
             if (!Mathf.Approximately(velocity.x, 0f)) facing = -Mathf.Sign(velocity.x);
         }
 
+
+        /// <summary>慢动作补偿：世界变慢时让玩家仍保持正常移动速度。</summary>
+        public void SetSpeedMultiplier(float multiplier)
+        {
+            speedMultiplier = Mathf.Clamp(multiplier, 0.1f, 10f);
+        }
 
         public void ApplyGravityOverride(float acceleration, float maxSpeed, float duration)
         {

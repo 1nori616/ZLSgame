@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Game.Gravity;
 using UnityEngine;
 
@@ -7,8 +8,9 @@ namespace Game.Player
     /// 玩家的重力技能（充能制，自动回复）：
     ///   Q = 对目标施放反重力（飘起）
     ///   E = 对目标施放加重（砸下，会打断漂浮）
-    ///   R = 对自己施放反重力（反重力跳）
-    ///   F = 翻转整个房间的重力（10 秒后自动恢复）
+    ///   R = 对自己施放反重力
+    ///   F = 翻转整个房间的重力
+    ///   Tab = 切换手动锁定目标（锁定后 Q/E 只作用于它）
     /// </summary>
     public class GravityShift : MonoBehaviour
     {
@@ -19,22 +21,28 @@ namespace Game.Player
         [Tooltip("留空会自动找 Camera.main 上的 CameraFollow")]
         [SerializeField] private Game.CameraSystem.CameraFollow cameraFollow;
 
+        [Tooltip("留空会自动找 Main Camera 上的 Vignette")]
+        [SerializeField] private Game.Effects.Vignette vignette;
+
         [Tooltip("锁定目标在重力持续时间之外还能保留多久（秒）")]
         [SerializeField] private float targetLockExtra = 0.5f;
 
         private int charges;
         private float rechargeTimer;
-        private GravityAffected lockedTarget;
-        private float lockTimer;
         private float flipCooldownTimer;
+
+        private GravityAffected manualLock;   // Tab 选中的目标
+        private GravityAffected lastCast;     // 上一次施放的对象（自动续接）
+        private float lastCastTimer;
 
         public int Charges => charges;
         public int MaxCharges => config != null ? config.gravityCharges : 3;
         public bool IsReady => charges > 0;
         public bool CanFlip => flipCooldownTimer <= 0f;
-        public GravityAffected LockedTarget => lockedTarget;
-        public float RechargeProgress =>
-            config == null ? 0f : 1f - Mathf.Clamp01(rechargeTimer / Mathf.Max(0.01f, config.gravityRechargeTime));
+
+        /// <summary>当前生效的目标：手动锁定优先。</summary>
+        public GravityAffected LockedTarget => IsValid(manualLock) ? manualLock : (IsValid(lastCast) ? lastCast : null);
+        public bool HasManualLock => IsValid(manualLock);
 
         private void Awake()
         {
@@ -45,6 +53,9 @@ namespace Game.Player
 
             if (cameraFollow == null && Camera.main != null)
                 cameraFollow = Camera.main.GetComponent<Game.CameraSystem.CameraFollow>();
+
+            if (vignette == null && Camera.main != null)
+                vignette = Camera.main.GetComponent<Game.Effects.Vignette>();
         }
 
         private void Update()
@@ -52,11 +63,12 @@ namespace Game.Player
             if (config == null || input == null) return;
 
             TickRecharge();
-            TickLock();
-            if (flipCooldownTimer > 0f) flipCooldownTimer -= Time.deltaTime;
+            TickTimers();
 
             PlayerInputData data = input.Read();
 
+            if (data.ClickDown) LockByPointer(data.Pointer);
+            else if (data.LockDown) SelectNextLock();
             if (data.AntiDown) TryCastOnTarget(GravityMode.AntiGravity);
             if (data.HeavyDown) TryCastOnTarget(GravityMode.Heavy);
             if (data.SelfDown) TryCastOnSelf();
@@ -79,82 +91,102 @@ namespace Game.Player
             }
         }
 
-        private void TickLock()
+        private void TickTimers()
         {
-            if (lockTimer > 0f)
+            if (flipCooldownTimer > 0f) flipCooldownTimer -= Time.deltaTime;
+
+            if (lastCastTimer > 0f)
             {
-                lockTimer -= Time.deltaTime;
-                if (lockTimer <= 0f) lockedTarget = null;
+                lastCastTimer -= Time.deltaTime;
+                if (lastCastTimer <= 0f) lastCast = null;
             }
 
-            if (lockedTarget != null && !lockedTarget.IsValidTarget) lockedTarget = null;
+            // 手动锁定失效就自动解除
+            if (manualLock != null && !IsValid(manualLock))
+            {
+                manualLock = null;
+                SetAim(false);
+            }
+            if (manualLock != null && DistanceTo(manualLock) > config.lockRange)
+            {
+                manualLock = null;
+                SetAim(false);
+            }
         }
 
-        private void ConsumeCharge()
+        private bool IsValid(GravityAffected target)
         {
-            if (charges == config.gravityCharges) rechargeTimer = config.gravityRechargeTime;
-            charges = Mathf.Max(0, charges - 1);
+            return target != null && target.IsValidTarget;
         }
 
-        public bool TryCastOnTarget(GravityMode mode)
+        private float DistanceTo(GravityAffected target)
         {
-            if (!IsReady) return false;
-
-            GravityAffected target = ResolveTarget();
-            if (target == null) return false;
-
-            target.ApplyOverride(config.gravityDuration, mode);
-            ConsumeCharge();
-
-            lockedTarget = target;
-            lockTimer = config.gravityDuration + targetLockExtra;
-
-            FocusCamera(target.transform);
-            return true;
+            if (target == null) return float.MaxValue;
+            return Vector2.Distance(transform.position, target.transform.position);
         }
 
-        public bool TryCastOnSelf()
+        [Tooltip("鼠标点击容差：点到这个半径内的目标才算选中")]
+        [SerializeField] private float clickRadius = 0.8f;
+
+        [Header("锁定慢动作")]
+        [Tooltip("锁定时的时间流速，0.35 = 三成速度")]
+        [Range(0.05f, 1f)]
+        [SerializeField] private float aimTimeScale = 0.35f;
+
+        [Tooltip("锁定时镜头聚焦的时长（够长即可）")]
+        [SerializeField] private float aimFocusDuration = 999f;
+
+        [Tooltip("锁定时镜头推近多少（正交尺寸减少量，越大越近）")]
+        [SerializeField] private float aimZoomIn = 1.4f;
+
+        private bool aiming;
+
+        /// <summary>进入/退出"瞄准慢动作"：慢时间 + 镜头推近目标。</summary>
+        private void SetAim(bool on)
         {
-            if (!IsReady || motor == null) return false;
+            if (aiming == on) return;
+            aiming = on;
 
-            motor.ApplyGravityOverride(config.selfAntiAcceleration, config.selfAntiMaxSpeed, config.gravityDuration);
-            ConsumeCharge();
-            return true;
-        }
+            Time.timeScale = on ? aimTimeScale : 1f;
 
-        /// <summary>翻转整个房间的重力，duration 秒后自动恢复。</summary>
-        public bool TryFlip()
-        {
-            if (!CanFlip || GravityWorld.Instance == null) return false;
+            // 世界变慢，但玩家保持正常速度 → "我快、世界慢"的子弹时间感
+            if (motor != null) motor.SetSpeedMultiplier(on ? 1f / Mathf.Max(0.05f, aimTimeScale) : 1f);
 
-            GravityWorld.Instance.Toggle(config.flipDuration);
-            flipCooldownTimer = config.flipCooldown;
-            return true;
-        }
+            if (vignette != null) vignette.SetActive(on);
 
-        private void FocusCamera(Transform targetTransform)
-        {
             if (cameraFollow == null) return;
-            cameraFollow.FocusOn(targetTransform, config.cameraFocusDuration);
+
+            if (on && IsValid(manualLock))
+                cameraFollow.FocusOn(manualLock.transform, aimFocusDuration, -aimZoomIn);
+            else
+                cameraFollow.ClearFocus();
         }
 
-        private GravityAffected ResolveTarget()
+        private void OnDisable()
         {
-            if (lockedTarget != null && lockedTarget.IsValidTarget) return lockedTarget;
-
-            lockedTarget = null;
-            return FindTarget();
+            if (aiming)
+            {
+                aiming = false;
+                Time.timeScale = 1f;
+                if (motor != null) motor.SetSpeedMultiplier(1f);
+                if (vignette != null) vignette.SetActive(false);
+                if (cameraFollow != null) cameraFollow.ClearFocus();
+            }
         }
 
-        private GravityAffected FindTarget()
+        /// <summary>鼠标左键：点中谁就锁谁，点空地取消锁定。</summary>
+        public void LockByPointer(Vector2 screenPosition)
         {
-            if (config == null) return null;
+            Camera cam = Camera.main;
+            if (cam == null) return;
 
-            Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, config.castRadius, config.castLayer);
-            float facing = motor != null ? motor.Facing : 1f;
+            float depth = -cam.transform.position.z;
+            Vector3 screen = new Vector3(screenPosition.x, screenPosition.y, depth);
+            Vector2 world = cam.ScreenToWorldPoint(screen);
 
+            Collider2D[] hits = Physics2D.OverlapCircleAll(world, clickRadius, config.castLayer);
             GravityAffected best = null;
-            float bestScore = float.MaxValue;
+            float bestDistance = float.MaxValue;
 
             for (int i = 0; i < hits.Length; i++)
             {
@@ -167,39 +199,182 @@ namespace Game.Player
                 Combat.Health hp = candidate.GetComponent<Combat.Health>();
                 if (hp != null && hp.IsDead) continue;
 
-                Vector2 delta = (Vector2)candidate.transform.position - (Vector2)transform.position;
-                float distance = delta.magnitude;
-
-                bool inFront = Mathf.Abs(delta.x) < 0.2f || Mathf.Sign(delta.x) == Mathf.Sign(facing);
-                float score = distance * (inFront ? config.frontPreference : 1f);
-
-                if (score < bestScore)
+                float d = Vector2.Distance(world, candidate.transform.position);
+                if (d < bestDistance)
                 {
-                    bestScore = score;
+                    bestDistance = d;
                     best = candidate;
                 }
             }
 
-            return best;
+            manualLock = best;   // null = 点空地，取消锁定
+            SetAim(manualLock != null);
+        }
+
+        /// <summary>Tab：在范围内按距离循环切换锁定目标。</summary>
+        public void SelectNextLock()
+        {
+            List<GravityAffected> candidates = Collect(transform.position, config.lockRange);
+            if (candidates.Count == 0)
+            {
+                manualLock = null;
+                return;
+            }
+
+            if (manualLock == null || !candidates.Contains(manualLock))
+            {
+                manualLock = candidates[0];
+                return;
+            }
+
+            int index = candidates.IndexOf(manualLock);
+            manualLock = candidates[(index + 1) % candidates.Count];
+        }
+
+        /// <summary>收集范围内所有可施放目标，按距离从近到远排序。</summary>
+        private List<GravityAffected> Collect(Vector2 center, float radius)
+        {
+            List<GravityAffected> result = new List<GravityAffected>();
+            Collider2D[] hits = Physics2D.OverlapCircleAll(center, radius, config.castLayer);
+
+            for (int i = 0; i < hits.Length; i++)
+            {
+                if (hits[i].transform.IsChildOf(transform)) continue;
+
+                GravityAffected candidate = hits[i].GetComponentInParent<GravityAffected>();
+                if (candidate == null || candidate.transform.IsChildOf(transform)) continue;
+                if (!candidate.IsValidTarget) continue;
+                if (result.Contains(candidate)) continue;
+
+                Combat.Health hp = candidate.GetComponent<Combat.Health>();
+                if (hp != null && hp.IsDead) continue;
+
+                result.Add(candidate);
+            }
+
+            result.Sort((a, b) =>
+                Vector2.Distance(center, a.transform.position)
+                .CompareTo(Vector2.Distance(center, b.transform.position)));
+
+            return result;
+        }
+
+        public bool TryCastOnTarget(GravityMode mode)
+        {
+            if (!IsReady) return false;
+
+            // 严格模式：没有锁定目标就不能施放
+            if (!IsValid(manualLock)) return false;
+            if (DistanceTo(manualLock) > config.lockRange) return false;
+
+            GravityAffected target = manualLock;
+
+            target.ApplyOverride(config.gravityDuration, mode, BuildImpulse(mode));
+            ConsumeCharge();
+
+            lastCast = target;
+            lastCastTimer = config.gravityDuration + targetLockExtra;
+
+            // 一次操作后自动解除锁定：想再连一次，需要重新点击目标
+            SetAim(false);
+            manualLock = null;
+            lastCast = null;
+            lastCastTimer = 0f;
+
+            FocusCamera(target.transform);
+            return true;
+        }
+
+        /// <summary>Q：朝身前拉；E：朝身前甩出去。</summary>
+        private Vector2 BuildImpulse(GravityMode mode)
+        {
+            float facing = motor != null ? motor.Facing : 1f;
+
+            if (mode == GravityMode.AntiGravity)
+                return new Vector2(facing * config.antiThrowX, config.antiThrowUp);
+
+            return new Vector2(facing * config.heavyThrowX, config.heavyThrowDown);
+        }
+
+        private GravityAffected ResolveTarget()
+        {
+            // 1) 手动锁定优先
+            if (IsValid(manualLock) && DistanceTo(manualLock) <= config.lockRange) return manualLock;
+
+            // 2) 上次施放的目标（续接连段）
+            if (IsValid(lastCast) && DistanceTo(lastCast) <= config.lockRange) return lastCast;
+
+            // 3) 自动选最近的
+            List<GravityAffected> near = Collect(transform.position, config.castRadius);
+            return near.Count > 0 ? near[0] : null;
+        }
+
+        public bool TryCastOnSelf()
+        {
+            if (!IsReady || motor == null) return false;
+
+            motor.ApplyGravityOverride(config.selfAntiAcceleration, config.selfAntiMaxSpeed, config.gravityDuration);
+            ConsumeCharge();
+            return true;
+        }
+
+        public bool TryFlip()
+        {
+            if (!CanFlip || GravityWorld.Instance == null) return false;
+
+            GravityWorld.Instance.Toggle(config.flipDuration);
+            flipCooldownTimer = config.flipCooldown;
+            return true;
+        }
+
+        private void ConsumeCharge()
+        {
+            if (charges == config.gravityCharges) rechargeTimer = config.gravityRechargeTime;
+            charges = Mathf.Max(0, charges - 1);
+        }
+
+        private void FocusCamera(Transform targetTransform)
+        {
+            if (cameraFollow == null) return;
+            cameraFollow.FocusOn(targetTransform, config.cameraFocusDuration);
         }
 
         private void OnGUI()
         {
             if (config == null) return;
 
+            // ---- 锁定指示：目标头顶画 ▼ ----
+            if (HasManualLock && Camera.main != null)
+            {
+                Vector3 p = Camera.main.WorldToScreenPoint(manualLock.transform.position + Vector3.up * 0.8f);
+                if (p.z > 0f)
+                {
+                    var style = new GUIStyle(GUI.skin.label)
+                    {
+                        fontSize = 22,
+                        alignment = TextAnchor.MiddleCenter,
+                        normal = { textColor = new Color(1f, 0.85f, 0.2f) }
+                    };
+                    GUI.Label(new Rect(p.x - 20f, Screen.height - p.y - 20f, 40f, 30f), "▼", style);
+                }
+            }
+
+            // ---- 左上角 HUD ----
             string pip = "";
             for (int i = 0; i < config.gravityCharges; i++)
                 pip += i < charges ? "●" : "○";
 
             string text = $"重力 {pip}";
-            if (lockedTarget != null) text += $"  [锁定: {lockedTarget.name} x{lockedTarget.ChainCount}]";
+            if (HasManualLock) text += $"  [锁定 {manualLock.name}]";
+            else text += "  [左键锁定]";
 
             if (GravityWorld.Instance != null && GravityWorld.Instance.IsFlipped)
-                text += $"  [翻转中 {GravityWorld.Instance.RemainingTime:0.0}s]";
-            else if (!CanFlip)
-                text += "  [翻转冷却]";
+                text += $"  [翻转 {GravityWorld.Instance.RemainingTime:0.0}s]";
 
-            GUILayout.BeginArea(new Rect(12f, 46f, 520f, 50f));
+            if (manualLock != null && manualLock.ChainCount > 1)
+                text += $"  x{manualLock.ChainCount}";
+
+            GUILayout.BeginArea(new Rect(12f, 46f, 560f, 50f));
             GUILayout.Label(text);
             GUILayout.EndArea();
         }

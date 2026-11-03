@@ -39,6 +39,7 @@ namespace Game.CameraSystem
         private float baseSize;
         private Transform focusTarget;
         private float focusTimer;
+        private float focusZoom;
 
         private float trauma;
 
@@ -72,11 +73,12 @@ namespace Game.CameraSystem
             trauma = Mathf.Clamp(trauma + amount, 0f, 1f);
         }
 
-        public void FocusOn(Transform focus, float duration)
+        public void FocusOn(Transform focus, float duration, float zoomDelta = 0f)
         {
             if (focus == null) return;
             focusTarget = focus;
             focusTimer = Mathf.Max(0.01f, duration);
+            focusZoom = zoomDelta;
         }
 
         public void ClearFocus()
@@ -114,7 +116,7 @@ namespace Game.CameraSystem
 
             if (cam != null && cam.orthographic)
             {
-                float targetSize = baseSize + (IsFocusing ? focusZoomOut : 0f);
+                float targetSize = baseSize + (IsFocusing ? focusZoom : 0f);
                 cam.orthographicSize = Mathf.Lerp(cam.orthographicSize, targetSize, focusBlend * Time.deltaTime);
             }
 

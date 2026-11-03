@@ -63,6 +63,22 @@ namespace Game.Player
         [Tooltip("施放判定能命中的层")]
         public LayerMask castLayer = ~0;
 
+        [Tooltip("Tab 锁定目标的最大距离")]
+        public float lockRange = 8f;
+
+        [Header("重力抛掷（让 Q/E 带水平方向）")]
+        [Tooltip("Q 时朝身前拉的水平速度")]
+        public float antiThrowX = 2.5f;
+
+        [Tooltip("Q 时上浮的初速度")]
+        public float antiThrowUp = 7f;
+
+        [Tooltip("E 时朝身前甩的水平速度")]
+        public float heavyThrowX = 10f;
+
+        [Tooltip("E 时下压的初速度（负数=向下）")]
+        public float heavyThrowDown = -4f;
+
         [Header("受击")]
         public float hurtInvincibleTime = 0.5f;
         public float knockbackTime = 0.18f;

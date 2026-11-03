@@ -2,20 +2,20 @@ using UnityEngine;
 
 namespace Game.Player
 {
-    /// <summary>
-    /// 只负责读输入，不移动任何东西。
-    /// 用的是旧版 Input Manager 的默认轴（Horizontal / Jump），不需要额外配置。
-    /// </summary>
+    /// <summary>只负责读输入，不移动任何东西。</summary>
     public struct PlayerInputData
     {
-        public float MoveX;    // -1 ~ 1
-        public bool JumpDown;  // 本帧刚按下
-        public bool JumpHeld;  // 持续按住
-        public bool DashDown;  // 本帧刚按下冲刺
-        public bool AntiDown;  // 本帧刚按下：反重力
-        public bool HeavyDown; // 本帧刚按下：加重
-        public bool SelfDown;  // 本帧刚按下：对自己施放
-        public bool FlipDown;  // 本帧刚按下：翻转重力
+        public float MoveX;      // -1 ~ 1
+        public bool JumpDown;
+        public bool JumpHeld;
+        public bool DashDown;
+        public bool AntiDown;    // Q 反重力
+        public bool HeavyDown;   // E 加重
+        public bool SelfDown;    // R 对自己
+        public bool FlipDown;    // F 翻转世界
+        public bool LockDown;    // Tab 切换锁定（备用）
+        public bool ClickDown;   // 鼠标左键：锁定/取消锁定
+        public Vector2 Pointer;  // 鼠标屏幕坐标
     }
 
     public class PlayerInput : MonoBehaviour
@@ -25,6 +25,7 @@ namespace Game.Player
         [SerializeField] private KeyCode heavyGravityKey = KeyCode.E;
         [SerializeField] private KeyCode selfGravityKey = KeyCode.R;
         [SerializeField] private KeyCode flipGravityKey = KeyCode.F;
+        [SerializeField] private KeyCode lockKey = KeyCode.Tab;
 
         public PlayerInputData Read()
         {
@@ -38,6 +39,9 @@ namespace Game.Player
                 HeavyDown = Input.GetKeyDown(heavyGravityKey),
                 SelfDown = Input.GetKeyDown(selfGravityKey),
                 FlipDown = Input.GetKeyDown(flipGravityKey),
+                LockDown = Input.GetKeyDown(lockKey),
+                ClickDown = Input.GetMouseButtonDown(0),
+                Pointer = Input.mousePosition,
             };
         }
     }

@@ -5,7 +5,8 @@ namespace Game.Gravity
 {
     /// <summary>
     /// 挂在"可以被改重力"的物体上：敌人、箱子、石块。
-    /// 施放时进入"匀加速"模式；同时检测是否站在地面（跟随世界重力方向）。
+    /// 施放时进入"匀加速 + 水平抛掷"模式：纵向按加速度走，横向给一个初速度并逐渐衰减。
+    /// 这样重力不只是上下，还能把东西"甩"向指定方向。
     /// </summary>
     [RequireComponent(typeof(Rigidbody2D))]
     public class GravityAffected : MonoBehaviour
@@ -24,6 +25,10 @@ namespace Game.Gravity
         [SerializeField] private float heavyAcceleration = 45f;
         [SerializeField] private float heavyMaxSpeed = 24f;
 
+        [Header("水平抛掷")]
+        [Tooltip("横向速度每秒衰减多少，越大甩得越近")]
+        [SerializeField] private float throwDrag = 18f;
+
         [Header("接地检测")]
         [SerializeField] private LayerMask groundLayer = ~0;
         [Range(0.5f, 1f)] [SerializeField] private float groundCheckWidthScale = 0.9f;
@@ -40,6 +45,9 @@ namespace Game.Gravity
         public float BaseScale => baseGravityScale;
         public float RemainingTime => Mathf.Max(0f, overrideTimer);
 
+        /// <summary>距上一次被重力施放过了多久（秒）。用于判断"摔伤"是否成立。</summary>
+        public float TimeSinceLastCast => Time.time - lastCastTime;
+
         public int ChainCount { get; private set; }
         public GravityMode LastMode { get; private set; }
         public float ChainWindow => chainWindow;
@@ -47,7 +55,6 @@ namespace Game.Gravity
 
         private int Sign => GravityWorld.Instance != null ? GravityWorld.Instance.Sign : 1;
 
-        /// <summary>站在地面（相对当前重力方向）时被"加重"，触发"被压住"的反馈。</summary>
         public event Action<GravityAffected> OnGroundSlam;
 
         private void Awake()
@@ -108,10 +115,18 @@ namespace Game.Gravity
             float maxSpeed = LastMode == GravityMode.AntiGravity ? antiMaxSpeed : heavyMaxSpeed;
 
             float vy = Mathf.Clamp(rb.velocity.y + accel * Time.fixedDeltaTime, -maxSpeed, maxSpeed);
-            rb.velocity = new Vector2(rb.velocity.x, vy);
+
+            // 横向速度逐渐衰减，让"甩出去"有距离感，而不是一直飞
+            float vx = Mathf.MoveTowards(rb.velocity.x, 0f, throwDrag * Time.fixedDeltaTime);
+
+            rb.velocity = new Vector2(vx, vy);
         }
 
-        public void ApplyOverride(float duration, GravityMode mode)
+        /// <summary>
+        /// 施放重力。
+        /// impulse 是水平/纵向初速度：Q 用来"拉向身前"，E 用来"甩向前方"。
+        /// </summary>
+        public void ApplyOverride(float duration, GravityMode mode, Vector2 impulse = default)
         {
             if (rb == null) return;
 
@@ -121,6 +136,10 @@ namespace Game.Gravity
 
             overrideTimer = Mathf.Max(0.01f, duration);
             rb.gravityScale = 0f;
+
+            if (impulse != Vector2.zero)
+                rb.velocity = new Vector2(impulse.x, impulse.y);
+
             rb.WakeUp();
 
             if (mode == GravityMode.Heavy && IsGrounded)
