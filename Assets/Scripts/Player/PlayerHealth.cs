@@ -50,6 +50,7 @@ namespace Game.Player
             if (health != null) health.TakeDamage(info);
 
             ShakeCamera(info.Amount);
+            Game.Effects.Sfx.PlayHit(0.9f);
 
             // 击退方向：背离伤害源
             float dir = -1f;

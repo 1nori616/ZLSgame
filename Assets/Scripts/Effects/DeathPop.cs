@@ -78,6 +78,8 @@ namespace Game.Effects
 
         private IEnumerator PopRoutine()
         {
+            Sfx.PlayDeath();
+
             CameraFollow cam = CameraFollow.Instance;
             if (cam != null) cam.Shake(shake);
 
