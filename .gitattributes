@@ -1,6 +1,22 @@
-*.mp3 filter=lfs diff=lfs merge=lfs -text
-*.tga filter=lfs diff=lfs merge=lfs -text
-*.png filter=lfs diff=lfs merge=lfs -text
-*.psd filter=lfs diff=lfs merge=lfs -text
-*.fbx filter=lfs diff=lfs merge=lfs -text
-*.wav filter=lfs diff=lfs merge=lfs -text
+# 统一换行符，避免 Unity 文件每次检出都显示"整个文件被改动"
+* text=auto
+
+# Unity 的文本序列化文件统一用 LF
+*.unity      text eol=lf
+*.prefab     text eol=lf
+*.asset      text eol=lf
+*.meta       text eol=lf
+*.anim       text eol=lf
+*.controller text eol=lf
+*.mat        text eol=lf
+*.cs         text eol=lf
+*.md         text eol=lf
+
+# 二进制资源不要让 Git 处理换行
+*.png  binary
+*.jpg  binary
+*.psd  binary
+*.wav  binary
+*.mp3  binary
+*.ogg  binary
+*.ttf  binary
