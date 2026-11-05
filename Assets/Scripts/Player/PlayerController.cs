@@ -29,6 +29,9 @@ namespace Game.Player
         private static readonly int VerticalSpeedHash = Animator.StringToHash("VerticalSpeed");
         private static readonly int DashHash = Animator.StringToHash("Dash");
 
+        /// <summary>当前播放的动画状态名，避免每帧重复 Play 导致动画卡在第一帧。</summary>
+        private string currentState;
+
         private void Awake()
         {
             if (input == null) input = GetComponent<PlayerInput>();
@@ -78,13 +81,28 @@ namespace Game.Player
 
             if (animator == null) return;
 
-            // 动画控制器没配置参数时不要调用，否则每帧刷警告
-            if (animator.parameterCount == 0) return;
+            bool moving = Mathf.Abs(motor.HorizontalSpeed) > 0.2f;
+            bool grounded = motor.IsGrounded;
 
-            animator.SetFloat(SpeedHash, motor.HorizontalSpeed);
-            animator.SetBool(GroundedHash, motor.IsGrounded);
-            animator.SetFloat(VerticalSpeedHash, motor.VerticalVelocity);
-            animator.SetBool(DashHash, motor.IsDashing);
+            if (!grounded)
+                PlayState(motor.VerticalVelocity > 0f ? "Player_Jump" : "Player_Fall");
+            else
+                PlayState(moving ? "Player_Run" : "Player_Idle");
+        }
+
+        /// <summary>只在状态变化时调用 Play，否则每帧调用会把动画重置到第 0 帧。</summary>
+        private void PlayState(string stateName)
+        {
+            if (currentState == stateName) return;
+
+            // 没有对应状态就退回待机，避免 Animation.Play 报错
+            if (!animator.HasState(0, Animator.StringToHash(stateName)))
+                stateName = "Player_Idle";
+
+            if (currentState == stateName) return;
+
+            currentState = stateName;
+            animator.Play(stateName, 0, 0f);
         }
     }
 }
