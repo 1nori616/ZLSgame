@@ -71,6 +71,7 @@ namespace Game.EditorTools
             cam.backgroundColor = new Color(0.10f, 0.12f, 0.16f);
             camGo.transform.position = new Vector3(width * 0.5f, height * 0.5f, -10f);
             camGo.AddComponent<Game.CameraSystem.CameraFollow>();
+            camGo.AddComponent<Game.Effects.Vignette>();   // 锁定/失重的暗角效果
 
             // ---- 重力世界 ----
             var gwGo = new GameObject("GravityWorld");
@@ -198,14 +199,15 @@ namespace Game.EditorTools
 
             if (solid)
             {
+                // 合并碰撞体：避免角色卡在两块地砖的接缝上
                 var col = go.AddComponent<TilemapCollider2D>();
                 col.usedByComposite = true;
 
                 var rb = go.AddComponent<Rigidbody2D>();
                 rb.bodyType = RigidbodyType2D.Static;
 
-                var composite = go.AddComponent<CompositeCollider2D>();
-                composite.geometryType = CompositeCollider2D.GeometryType.Polygons;
+                go.AddComponent<CompositeCollider2D>();
+                go.AddComponent<Game.Level.TilemapColliderBaker>();   // 运行时补烘焙
             }
 
             return tilemap;

@@ -36,13 +36,15 @@ namespace Game.Enemy
         [SerializeField] private float fallGravityMultiplier = 1.5f;
 
         [Header("跳跃")]
+        [Tooltip("关掉后敌人只会在地面追，遇到台阶/墙就停下（最稳，不会爬墙）")]
+        [SerializeField] private bool allowJump = false;
         [SerializeField] private float jumpForce = 11f;
 
         [Tooltip("前方多远处检测墙")]
-        [SerializeField] private float wallCheckDistance = 0.55f;
+        [SerializeField] private float wallCheckDistance = 0.8f;
 
         [Tooltip("前方多远处检测是不是悬崖")]
-        [SerializeField] private float ledgeCheckDistance = 0.7f;
+        [SerializeField] private float ledgeCheckDistance = 0.9f;
 
         [SerializeField] private LayerMask groundLayer = ~0;
         [SerializeField] private float jumpCooldown = 0.5f;
@@ -70,6 +72,7 @@ namespace Game.Enemy
         private float jumpTimer;
         private float climbTimer;
         private float stuckTimer;
+        private int airJumps;   // 空中补跳计数，防止贴墙连续起跳往上爬
         private Vector2 lastPosition;
         private float facing = 1f;
 
@@ -189,9 +192,9 @@ namespace Game.Enemy
             {
                 stuckTimer = 0f;
 
-                // 卡住时不管是否着地都跳：被箱角顶住时脚可能离地，
-                // 如果要求 IsGrounded，就会永远不跳，卡死在这里。
-                if (jumpTimer <= 0f) DoJump();
+                // 严格：只有站在地上才能跳。
+                // 只要允许空中起跳，贴着墙就能每 0.25 秒蹭一次，最终一定会爬上去。
+                if (allowJump && IsGrounded() && jumpTimer <= 0f) DoJump();
                 return;
             }
 
@@ -201,6 +204,7 @@ namespace Game.Enemy
         /// <summary>前方有墙，或者前方没有地面 → 跳过去。</summary>
         private void TryJump()
         {
+            if (!allowJump) return;
             if (jumpTimer > 0f) return;
             if (!IsGrounded()) return;
 
@@ -226,7 +230,7 @@ namespace Game.Enemy
             Vector2 origin = new Vector2(b.center.x + facing * 0.5f, b.center.y + 2f);
             RaycastHit2D hit = Physics2D.Raycast(origin, new Vector2(0f, -1f), 4f, groundLayer);
 
-            if (hit.collider == null || hit.collider == body) return 999f;
+            if (IsIgnorable(hit.collider) || hit.collider == body) return 999f;
 
             float feetY = sign > 0 ? b.min.y : b.max.y;
             return (hit.point.y - feetY) * sign;
@@ -242,6 +246,15 @@ namespace Game.Enemy
             rb.WakeUp();
         }
 
+        /// <summary>自己的（含子物体）碰撞体、或者 Trigger，都不能当作地面/墙。</summary>
+        private bool IsIgnorable(Collider2D c)
+        {
+            if (c == null) return true;
+            if (c.isTrigger) return true;                        // AttackHitbox、hurtbox 等
+            if (c.transform.IsChildOf(transform)) return true;   // 自己的子碰撞体
+            return false;
+        }
+
         private bool IsGrounded()
         {
             if (body == null) return false;
@@ -252,7 +265,11 @@ namespace Game.Enemy
             Vector2 origin = new Vector2(b.center.x, y);
 
             RaycastHit2D hit = Physics2D.Raycast(origin, new Vector2(0f, -sign), 0.18f, groundLayer);
-            return hit.collider != null && hit.collider != body;
+            if (IsIgnorable(hit.collider) || hit.collider == body) return false;
+
+            // 只认“朝上”的面：贴着竖直墙时射线会打到墙侧面，
+            // 若把它当成地面，敌人就会在墙上连续起跳，看起来像踩着空气台阶往上爬。
+            return hit.normal.y * sign > 0.5f;
         }
 
         private bool BlockedAhead()
@@ -262,7 +279,7 @@ namespace Game.Enemy
             Bounds b = body.bounds;
             Vector2 origin = new Vector2(b.center.x, b.center.y);
             RaycastHit2D hit = Physics2D.Raycast(origin, new Vector2(facing, 0f), wallCheckDistance, groundLayer);
-            return hit.collider != null && hit.collider != body;
+            return !IsIgnorable(hit.collider) && hit.collider != body;
         }
 
         private bool NoGroundAhead()
