@@ -204,6 +204,9 @@ MonoBehaviour:
   hitShake: 0.25
   shakePerDamage: 0.1
   ceilingShake: 0.25
+  hitStop: 0.06
+  hitStopPerDamage: 0.01
+  hitStopMax: 0.12
 --- !u!114 &27125471
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1879,9 +1882,7 @@ MonoBehaviour:
   dashKey: 304
   antiGravityKey: 113
   heavyGravityKey: 101
-  selfGravityKey: 114
-  flipGravityKey: 102
-  lockKey: 9
+  zeroGravityKey: 102
 --- !u!212 &1043377677
 SpriteRenderer:
   m_ObjectHideFlags: 0
@@ -2525,6 +2526,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   normalGravity: 9.81
   flipDuration: 10
+  zeroGDrag: 1.4
+  zeroGWander: 1.2
+  zeroGLiftSpeed: 2.6
+  zeroGVelocityKeep: 0.25
 --- !u!4 &1280924615
 Transform:
   m_ObjectHideFlags: 0
