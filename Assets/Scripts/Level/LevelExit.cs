@@ -39,7 +39,11 @@ namespace Game.Level
         private void OnTriggerEnter2D(Collider2D other)
         {
             if (completed) return;
-            if (!other.CompareTag(playerTag)) return;
+
+            // 优先认 Tag，其次认 PlayerHealth 组件（预制体容易漏设 Tag）
+            bool isPlayer = other.CompareTag(playerTag)
+                            || other.GetComponentInParent<Game.Player.PlayerHealth>() != null;
+            if (!isPlayer) return;
 
             Complete();
         }
