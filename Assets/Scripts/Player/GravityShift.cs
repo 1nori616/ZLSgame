@@ -30,6 +30,9 @@ namespace Game.Player
         private int charges;
         private float rechargeTimer;
         private float flipCooldownTimer;
+        private float zeroGCharge;
+        private bool zeroGVisualOn;
+        private float zeroGCooldownTimer;
 
         private GravityAffected manualLock;   // Tab 选中的目标
         private GravityAffected lastCast;     // 上一次施放的对象（自动续接）
@@ -39,6 +42,8 @@ namespace Game.Player
         public int MaxCharges => config != null ? config.gravityCharges : 3;
         public bool IsReady => charges > 0;
         public bool CanFlip => flipCooldownTimer <= 0f;
+        public bool CanZeroG => zeroGCooldownTimer <= 0f;
+        public float ZeroGCharge01 => config != null ? Mathf.Clamp01(zeroGCharge / Mathf.Max(0.01f, config.zeroGChargeTime)) : 0f;
 
         /// <summary>当前生效的目标：手动锁定优先。</summary>
         public GravityAffected LockedTarget => IsValid(manualLock) ? manualLock : (IsValid(lastCast) ? lastCast : null);
@@ -68,11 +73,10 @@ namespace Game.Player
             PlayerInputData data = input.Read();
 
             if (data.ClickDown) LockByPointer(data.Pointer);
-            else if (data.LockDown) SelectNextLock();
             if (data.AntiDown) TryCastOnTarget(GravityMode.AntiGravity);
             if (data.HeavyDown) TryCastOnTarget(GravityMode.Heavy);
-            if (data.SelfDown) TryCastOnSelf();
-            if (data.FlipDown) TryFlip();
+            UpdateZeroG(data);
+            TickZeroGVisual();
         }
 
         private void TickRecharge()
@@ -152,7 +156,14 @@ namespace Game.Player
             // 世界变慢，但玩家保持正常速度 → "我快、世界慢"的子弹时间感
             if (motor != null) motor.SetSpeedMultiplier(on ? 1f / Mathf.Max(0.05f, aimTimeScale) : 1f);
 
-            if (vignette != null) vignette.SetActive(on);
+            // 瞄准用黑色暗角；失重用淡蓝，这里必须显式指定颜色，否则会沿用上一次的
+            if (vignette != null)
+            {
+                if (on) vignette.SetActive(true, 0.72f, Color.black);
+                else if (GravityWorld.Instance != null && GravityWorld.Instance.IsZeroG)
+                    vignette.SetActive(true, 0.55f, new Color(0.35f, 0.62f, 0.95f));
+                else vignette.SetActive(false);
+            }
 
             if (cameraFollow == null) return;
 
@@ -309,14 +320,6 @@ namespace Game.Player
             return near.Count > 0 ? near[0] : null;
         }
 
-        public bool TryCastOnSelf()
-        {
-            if (!IsReady || motor == null) return false;
-
-            motor.ApplyGravityOverride(config.selfAntiAcceleration, config.selfAntiMaxSpeed, config.gravityDuration);
-            ConsumeCharge();
-            return true;
-        }
 
         public bool TryFlip()
         {
@@ -331,6 +334,46 @@ namespace Game.Player
         {
             if (charges == config.gravityCharges) rechargeTimer = config.gravityRechargeTime;
             charges = Mathf.Max(0, charges - 1);
+        }
+
+        /// <summary>失重时给画面加一层淡蓝暗角，让玩家一眼看出状态。</summary>
+        private void TickZeroGVisual()
+        {
+            bool on = GravityWorld.Instance != null && GravityWorld.Instance.IsZeroG;
+            if (on == zeroGVisualOn) return;
+
+            zeroGVisualOn = on;
+            if (vignette == null) return;
+
+            if (on)
+                vignette.SetActive(true, 0.55f, new Color(0.35f, 0.62f, 0.95f));
+            else if (!aiming)
+                vignette.SetActive(false);
+        }
+
+        /// <summary>按住 F 蓄力，满 1.5 秒进入失重；松开取消。</summary>
+        private void UpdateZeroG(PlayerInputData data)
+        {
+            if (zeroGCooldownTimer > 0f) zeroGCooldownTimer -= Time.deltaTime;
+
+            if (GravityWorld.Instance != null && GravityWorld.Instance.IsZeroG)
+            {
+                zeroGCharge = 0f;
+                return;
+            }
+
+            if (!data.ZeroGHeld || !CanZeroG)
+            {
+                zeroGCharge = 0f;
+                return;
+            }
+
+            zeroGCharge += Time.deltaTime;
+            if (zeroGCharge < config.zeroGChargeTime) return;
+
+            zeroGCharge = 0f;
+            zeroGCooldownTimer = config.zeroGCooldown;
+            GravityWorld.Instance.EnterZeroG(config.zeroGDuration);
         }
 
         private void FocusCamera(Transform targetTransform)
@@ -368,7 +411,9 @@ namespace Game.Player
             if (HasManualLock) text += $"  [锁定 {manualLock.name}]";
             else text += "  [左键锁定]";
 
-            if (GravityWorld.Instance != null && GravityWorld.Instance.IsFlipped)
+            if (GravityWorld.Instance != null && GravityWorld.Instance.IsZeroG)
+                text += $"  [失重 {GravityWorld.Instance.RemainingTime:0.0}s] WS={motor.TargetVertical:0} vy={motor.VerticalVelocity:0.0}";
+            else if (GravityWorld.Instance != null && GravityWorld.Instance.IsFlipped)
                 text += $"  [翻转 {GravityWorld.Instance.RemainingTime:0.0}s]";
 
             if (manualLock != null && manualLock.ChainCount > 1)

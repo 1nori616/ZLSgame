@@ -46,6 +46,16 @@ namespace Game.Gravity
         [Tooltip("撞天花板时的额外震屏（哪怕没掉血也给个反馈，可以设 0 关掉）")]
         [SerializeField] private float ceilingShake = 0.25f;
 
+        [Header("打击感")]
+        [Tooltip("命中时的顿帧时长（秒），0.05~0.08 比较明显")]
+        [SerializeField] private float hitStop = 0.06f;
+
+        [Tooltip("每点伤害额外增加的顿帧时长")]
+        [SerializeField] private float hitStopPerDamage = 0.01f;
+
+        [Tooltip("顿帧时长上限")]
+        [SerializeField] private float hitStopMax = 0.12f;
+
         private IDamageable damageable;
         private GravityAffected gravityAffected;
         private float cooldownTimer;
@@ -111,6 +121,10 @@ namespace Game.Gravity
                 Game.Effects.ComboCounter.Instance.AddHit();
 
             Shake(hitShake + shakePerDamage * damage);
+
+            float freeze = Mathf.Min(hitStopMax, hitStop + hitStopPerDamage * damage);
+            Game.Effects.HitStop.Freeze(freeze);
+
         }
 
         private static void Shake(float amount)

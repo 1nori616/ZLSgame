@@ -52,6 +52,14 @@ namespace Game.Effects
             targetAlpha = on ? maxAlpha : 0f;
         }
 
+        /// <summary>带颜色的暗角：失重时用淡蓝，瞄准锁定时用黑。</summary>
+        public void SetActive(bool on, float customAlpha, Color tint)
+        {
+            color = tint;
+            maxAlpha = Mathf.Clamp01(customAlpha);
+            targetAlpha = on ? maxAlpha : 0f;
+        }
+
         private void Update()
         {
             alpha = Mathf.MoveTowards(alpha, targetAlpha, fadeSpeed * Time.unscaledDeltaTime);

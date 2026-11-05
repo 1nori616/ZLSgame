@@ -56,6 +56,7 @@ namespace Game.Player
             else coyoteTimer -= Time.deltaTime;
 
             motor.SetHorizontal(data.MoveX);
+            motor.SetVertical(data.MoveY);
 
             if (bufferTimer > 0f && coyoteTimer > 0f)
             {

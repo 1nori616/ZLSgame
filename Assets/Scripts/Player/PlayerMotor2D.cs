@@ -15,6 +15,7 @@ namespace Game.Player
 
         private Rigidbody2D rb;
         private float targetHorizontal;
+        private float targetVertical;
         private bool jumpPending;
         private float pendingJumpForce;
 
@@ -80,7 +81,10 @@ namespace Game.Player
                 return;
             }
 
-            if (IsGravityOverridden) ApplyGravityRamp(sign);
+            bool zeroG = GravityWorld.Instance != null && GravityWorld.Instance.IsZeroG;
+
+            if (zeroG) ApplyZeroGControl();
+            else if (IsGravityOverridden) ApplyGravityRamp(sign);
             else ApplyGravityFeel(sign);
 
             if (knockbackTimer <= 0f) ApplyHorizontal(targetHorizontal);
@@ -94,6 +98,16 @@ namespace Game.Player
                 }
                 jumpPending = false;
             }
+        }
+
+        /// <summary>失重：纵向靠上下输入推进，横向加速度打折（行动不便但可控）。</summary>
+        private void ApplyZeroGControl()
+        {
+            rb.gravityScale = 0f;
+
+            float maxSpeed = config != null ? config.zeroGVerticalSpeed : 3.5f;
+            float vy = Mathf.MoveTowards(rb.velocity.y, targetVertical * maxSpeed, 20f * Time.fixedDeltaTime);
+            rb.velocity = new Vector2(rb.velocity.x, vy);
         }
 
         private void ApplyGravityFeel(int sign)
@@ -122,7 +136,11 @@ namespace Game.Player
 
         private void ApplyHorizontal(float input)
         {
-            float targetSpeed = input * config.moveSpeed * speedMultiplier;
+            float scale = (GravityWorld.Instance != null && GravityWorld.Instance.IsZeroG && config != null)
+                ? config.zeroGControlScale
+                : 1f;
+
+            float targetSpeed = input * config.moveSpeed * speedMultiplier * scale;
             float rate = Mathf.Approximately(input, 0f) ? config.deceleration : config.acceleration;
             float newX = Mathf.MoveTowards(rb.velocity.x, targetSpeed, rate * Time.fixedDeltaTime);
             rb.velocity = new Vector2(newX, rb.velocity.y);
@@ -157,8 +175,25 @@ namespace Game.Player
             targetHorizontal = Mathf.Clamp(input, -1f, 1f);
         }
 
+        /// <summary>失重时的上下推进输入（-1 下 / +1 上）。</summary>
+        public void SetVertical(float input)
+        {
+            targetVertical = Mathf.Clamp(input, -1f, 1f);
+        }
+
+        /// <summary>调试用：当前读到的纵向输入。</summary>
+        public float TargetVertical => targetVertical;
+
         public void Jump(float force)
         {
+            // 失重状态：跳跃键 = 向上推进（像喷气背包，可连点）
+            if (GravityWorld.Instance != null && GravityWorld.Instance.IsZeroG)
+            {
+                float thrust = config != null ? config.zeroGThrust : 4.5f;
+                rb.velocity = new Vector2(rb.velocity.x, rb.velocity.y + thrust);
+                return;
+            }
+
             if (!IsGrounded || IsDashing) return;
             jumpPending = true;
             pendingJumpForce = force;

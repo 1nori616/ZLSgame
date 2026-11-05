@@ -48,6 +48,26 @@ namespace Game.Player
         [Tooltip("两次翻转之间的冷却")]
         public float flipCooldown = 3f;
 
+        [Header("失重（按住 F 蓄力）")]
+        [Tooltip("需要按住多久才触发")]
+        public float zeroGChargeTime = 1.5f;
+
+        [Tooltip("失重持续时间（秒）")]
+        public float zeroGDuration = 6f;
+
+        [Tooltip("触发后的冷却（秒）")]
+        public float zeroGCooldown = 6f;
+
+        [Tooltip("失重时按跳跃键的向上推进力")]
+        public float zeroGThrust = 4.5f;
+
+        [Tooltip("失重时操控灵敏度，越小越迟钝")]
+        [Range(0.05f, 1f)]
+        public float zeroGControlScale = 0.45f;
+
+        [Tooltip("失重时上下推进的最大速度")]
+        public float zeroGVerticalSpeed = 3.5f;
+
         [Header("对自己施放（R）")]
         public float selfAntiAcceleration = 16f;
         public float selfAntiMaxSpeed = 6f;
