@@ -58,6 +58,7 @@ namespace Game.Enemy
 
         [Header("引用（留空自动找）")]
         [SerializeField] private SpriteRenderer spriteRenderer;
+        [SerializeField] private Animator animator;
 
         [Tooltip("素材朝向和代码相反时勾上")]
         [SerializeField] private bool invertFacing;
@@ -72,7 +73,8 @@ namespace Game.Enemy
         private float jumpTimer;
         private float climbTimer;
         private float stuckTimer;
-        private int airJumps;   // 空中补跳计数，防止贴墙连续起跳往上爬
+        private int airJumps;
+        private string currentState;   // 当前动画状态，避免每帧重复 Play
         private Vector2 lastPosition;
         private float facing = 1f;
 
@@ -88,6 +90,7 @@ namespace Game.Enemy
             gravity = GetComponent<GravityAffected>();
             health = GetComponent<Health>();
             if (spriteRenderer == null) spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+            if (animator == null) animator = GetComponentInChildren<Animator>();
 
             rb.freezeRotation = true;
             rb.gravityScale = gravityScale;
@@ -176,6 +179,30 @@ namespace Game.Enemy
             }
 
             if (chasing) DetectStuck();
+
+            UpdateAnimator();
+        }
+
+        /// <summary>按水平速度切换待机 / 走路。</summary>
+        private void UpdateAnimator()
+        {
+            if (animator == null) return;
+
+            bool moving = Mathf.Abs(rb.velocity.x) > 0.2f;
+            PlayState(moving ? "Enemy_Walk" : "Enemy_Idle");
+        }
+
+        private void PlayState(string stateName)
+        {
+            if (currentState == stateName) return;
+
+            if (!animator.HasState(0, Animator.StringToHash(stateName)))
+                stateName = "Enemy_Idle";
+
+            if (currentState == stateName) return;
+
+            currentState = stateName;
+            animator.Play(stateName, 0, 0f);
         }
 
         /// <summary>追着追着几乎没位移 → 认为被卡住，直接跳。</summary>
