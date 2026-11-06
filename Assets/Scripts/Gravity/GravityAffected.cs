@@ -126,6 +126,12 @@ namespace Game.Gravity
         /// 施放重力。
         /// impulse 是水平/纵向初速度：Q 用来"拉向身前"，E 用来"甩向前方"。
         /// </summary>
+        /// <summary>只记录"刚被施放"，不施加任何力（自己砸自己时用来开启摔伤判定）。</summary>
+        public void Stamp()
+        {
+            lastCastTime = Time.time;
+        }
+
         public void ApplyOverride(float duration, GravityMode mode, Vector2 impulse = default)
         {
             if (rb == null) return;

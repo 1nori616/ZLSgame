@@ -35,6 +35,13 @@ namespace Game.Player
         private float flipCooldownTimer;
         private float zeroGCharge;
         private bool zeroGVisualOn;
+        private Game.Gravity.GravityAffected selfGravity;
+
+        [Tooltip("对自己按 E 时的向下加速度")]
+        [SerializeField] private float selfHeavyAcceleration = 55f;
+
+        [Tooltip("对自己按 E 时的最大下落速度")]
+        [SerializeField] private float selfHeavyMaxSpeed = 26f;
         private float zeroGCooldownTimer;
 
         private GravityAffected manualLock;   // Tab 选中的目标
@@ -61,6 +68,8 @@ namespace Game.Player
 
             if (cameraFollow == null && Camera.main != null)
                 cameraFollow = Camera.main.GetComponent<Game.CameraSystem.CameraFollow>();
+
+            selfGravity = GetComponent<Game.Gravity.GravityAffected>();
 
             if (vignette == null && Camera.main != null)
                 vignette = Camera.main.GetComponent<Game.Effects.Vignette>();
@@ -204,11 +213,20 @@ namespace Game.Player
 
             for (int i = 0; i < hits.Length; i++)
             {
-                if (hits[i].transform.IsChildOf(transform)) continue;
+                GravityAffected candidate;
 
-                GravityAffected candidate = hits[i].GetComponentInParent<GravityAffected>();
-                if (candidate == null || candidate.transform.IsChildOf(transform)) continue;
-                if (!candidate.IsValidTarget) continue;
+                // 点到自己：锁自己（需要 player 上有 GravityAffected）
+                if (hits[i].transform.IsChildOf(transform))
+                {
+                    candidate = selfGravity;
+                }
+                else
+                {
+                    candidate = hits[i].GetComponentInParent<GravityAffected>();
+                    if (candidate != null && candidate.transform.IsChildOf(transform)) candidate = null;
+                }
+
+                if (candidate == null || !candidate.IsValidTarget) continue;
 
                 Combat.Health hp = candidate.GetComponent<Combat.Health>();
                 if (hp != null && hp.IsDead) continue;
@@ -253,11 +271,20 @@ namespace Game.Player
 
             for (int i = 0; i < hits.Length; i++)
             {
-                if (hits[i].transform.IsChildOf(transform)) continue;
+                GravityAffected candidate;
 
-                GravityAffected candidate = hits[i].GetComponentInParent<GravityAffected>();
-                if (candidate == null || candidate.transform.IsChildOf(transform)) continue;
-                if (!candidate.IsValidTarget) continue;
+                // 点到自己：锁自己（需要 player 上有 GravityAffected）
+                if (hits[i].transform.IsChildOf(transform))
+                {
+                    candidate = selfGravity;
+                }
+                else
+                {
+                    candidate = hits[i].GetComponentInParent<GravityAffected>();
+                    if (candidate != null && candidate.transform.IsChildOf(transform)) candidate = null;
+                }
+
+                if (candidate == null || !candidate.IsValidTarget) continue;
                 if (result.Contains(candidate)) continue;
 
                 Combat.Health hp = candidate.GetComponent<Combat.Health>();
@@ -283,7 +310,26 @@ namespace Game.Player
 
             GravityAffected target = manualLock;
 
-            target.ApplyOverride(config.gravityDuration, mode, BuildImpulse(mode));
+            if (target == selfGravity)
+            {
+                // 对自己施放：走 PlayerMotor 的通道，不碰别人的 GravityAffected
+                if (mode == GravityMode.Heavy)
+                {
+                    // 往下砸：给一个很强的向下加速度
+                    motor.ApplyGravityOverride(-selfHeavyAcceleration, selfHeavyMaxSpeed, config.gravityDuration);
+                    selfGravity.Stamp();      // 开启"落地摔伤"判定
+                }
+                else
+                {
+                    // 往上飘
+                    motor.ApplyGravityOverride(config.selfAntiAcceleration, config.selfAntiMaxSpeed, config.gravityDuration);
+                    selfGravity.Stamp();
+                }
+            }
+            else
+            {
+                target.ApplyOverride(config.gravityDuration, mode, BuildImpulse(mode));
+            }
             Game.Audio.SoundPlayer.Play("whoosh", 0.8f);
             ConsumeCharge();
 

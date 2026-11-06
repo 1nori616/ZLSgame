@@ -114,6 +114,8 @@ GameObject:
   - component: {fileID: 9142243959715333885}
   - component: {fileID: 2207325072878124384}
   - component: {fileID: 8672261941200817489}
+  - component: {fileID: 3371639881640081725}
+  - component: {fileID: 1959076439442054360}
   m_Layer: 0
   m_Name: P_Player
   m_TagString: Player
@@ -359,7 +361,10 @@ MonoBehaviour:
   config: {fileID: 0}
   cameraFollow: {fileID: 0}
   vignette: {fileID: 0}
+  showDebugHud: 0
   targetLockExtra: 0.5
+  selfHeavyAcceleration: 55
+  selfHeavyMaxSpeed: 26
   clickRadius: 0.8
   aimTimeScale: 0.35
   aimFocusDuration: 999
@@ -444,3 +449,53 @@ MonoBehaviour:
   pauseOnDeath: 1
   message: "\u4F60\u6B7B\u4E86"
   hint: "\u6309 R \u91CD\u65B0\u5F00\u59CB"
+--- !u!114 &3371639881640081725
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4423754162818949150}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 638116c185a231e4db30b586c1fee5b6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  baseGravityScale: 1
+  chainWindow: 2.5
+  antiAcceleration: 14
+  antiMaxSpeed: 5
+  heavyAcceleration: 45
+  heavyMaxSpeed: 24
+  throwDrag: 18
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  groundCheckWidthScale: 0.9
+  groundCheckDistance: 0.06
+--- !u!114 &1959076439442054360
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4423754162818949150}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a6aa3ecbe2b3dd74aaef103521dcd791, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  minDownImpactSpeed: 6
+  minUpImpactSpeed: 3.2
+  baseDamage: 1
+  damagePerSpeed: 6
+  ceilingDamageMultiplier: 0.7
+  chainDamageBonus: 0.5
+  cooldown: 0.2
+  gravityGrace: 2.5
+  hitShake: 0.25
+  shakePerDamage: 0.1
+  ceilingShake: 0.25
+  hitStop: 0.06
+  hitStopPerDamage: 0.01
+  hitStopMax: 0.12

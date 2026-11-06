@@ -17,6 +17,13 @@ namespace Game.Combat
         private Rigidbody2D rb;
         private Vector3 spawnPosition;
 
+        /// <summary>给关卡生成器用：按关卡尺寸设置上下边界。</summary>
+        public void Configure(float newMinY, float newMaxY)
+        {
+            minY = newMinY;
+            maxY = newMaxY;
+        }
+
         private void Awake()
         {
             rb = GetComponent<Rigidbody2D>();

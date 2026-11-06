@@ -34,6 +34,8 @@ namespace Game.EditorTools
         private const char Goal = 'G';
         private const char Hazard = '^';
 
+        private static int currentHeight = 20;
+
         [MenuItem("Tools/关卡/从文本生成关卡")]
         public static void BuildFromText()
         {
@@ -56,6 +58,7 @@ namespace Game.EditorTools
         private static void Build(string[] lines, string levelName, string levelPath)
         {
             int height = lines.Length;
+            currentHeight = height;
             int width = 0;
             for (int i = 0; i < height; i++) width = Mathf.Max(width, lines[i].Length);
 
@@ -67,7 +70,8 @@ namespace Game.EditorTools
             camGo.tag = "MainCamera";
             var cam = camGo.AddComponent<Camera>();
             cam.orthographic = true;
-            cam.orthographicSize = Mathf.Max(4.5f, height * 0.62f);
+            // 固定视野：不随关卡高度缩放，否则地图一高就"缩得很小"
+            cam.orthographicSize = 6.5f;
             cam.backgroundColor = new Color(0.10f, 0.12f, 0.16f);
             camGo.transform.position = new Vector3(width * 0.5f, height * 0.5f, -10f);
             camGo.AddComponent<Game.CameraSystem.CameraFollow>();
@@ -160,6 +164,11 @@ namespace Game.EditorTools
                 // 自动补 HUD（预制体上可能没有）
                 if (p.GetComponent<Game.UI.PlayerHud>() == null)
                     p.AddComponent<Game.UI.PlayerHud>();
+
+                // 按关卡高度设置出界边界：上方多留 8 格，下方多留 6 格
+                var bounds = p.GetComponent<Game.Combat.OutOfBounds>();
+                if (bounds == null) bounds = p.AddComponent<Game.Combat.OutOfBounds>();
+                bounds.Configure(-4f, height + 20f);
             }
             else
             {
@@ -235,6 +244,10 @@ namespace Game.EditorTools
 
             var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
             go.transform.position = pos;
+
+            // 敌人/箱子被重力甩飞时不要立刻判定出界传送回去
+            var bounds = go.GetComponent<Game.Combat.OutOfBounds>();
+            if (bounds != null) bounds.Configure(-4f, currentHeight + 20f);
         }
 
         private static Tilemap CreateTilemap(Transform parent, string name, bool solid)
