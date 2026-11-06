@@ -116,6 +116,7 @@ GameObject:
   - component: {fileID: 3919529269498206849}
   - component: {fileID: 6790424488895876809}
   - component: {fileID: 9191134545488596622}
+  - component: {fileID: 1479502823204142927}
   m_Layer: 0
   m_Name: P_Enemy
   m_TagString: Untagged
@@ -277,7 +278,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   maxHealth: 10
   destroyOnDeath: 0
-  showDebugHud: 1
+  showDebugHud: 0
 --- !u!114 &8849756243878356709
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -346,6 +347,7 @@ MonoBehaviour:
   acceleration: 30
   gravityScale: 2
   fallGravityMultiplier: 1.5
+  allowJump: 0
   jumpForce: 11
   wallCheckDistance: 0.55
   ledgeCheckDistance: 0.7
@@ -356,6 +358,7 @@ MonoBehaviour:
   stunDuration: 0.12
   hurtShake: 0.2
   spriteRenderer: {fileID: 0}
+  animator: {fileID: 0}
   invertFacing: 0
 --- !u!114 &2136535907704596561
 MonoBehaviour:
@@ -475,3 +478,22 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &1479502823204142927
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8222695250118828418}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 386f720cc7d0de1489abcb833274a4b7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  width: 30
+  height: 4
+  heightOffset: 1.05
+  alwaysShow: 0
+  showDuration: 2.5
+  backColor: {r: 0, g: 0, b: 0, a: 0.65}
+  fillColor: {r: 0.9, g: 0.25, b: 0.25, a: 1}

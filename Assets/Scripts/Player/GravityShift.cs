@@ -24,6 +24,9 @@ namespace Game.Player
         [Tooltip("留空会自动找 Main Camera 上的 Vignette")]
         [SerializeField] private Game.Effects.Vignette vignette;
 
+        [Tooltip("左上角那行调试文字（重力 ●●○ / 锁定 / 冷却），正式版建议关掉")]
+        [SerializeField] private bool showDebugHud = false;
+
         [Tooltip("锁定目标在重力持续时间之外还能保留多久（秒）")]
         [SerializeField] private float targetLockExtra = 0.5f;
 
@@ -404,7 +407,9 @@ namespace Game.Player
                 }
             }
 
-            // ---- 左上角 HUD ----
+            // ---- 左上角调试 HUD（正式版关掉）----
+            if (!showDebugHud) return;
+
             string pip = "";
             for (int i = 0; i < config.gravityCharges; i++)
                 pip += i < charges ? "●" : "○";
