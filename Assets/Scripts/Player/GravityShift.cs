@@ -281,6 +281,7 @@ namespace Game.Player
             GravityAffected target = manualLock;
 
             target.ApplyOverride(config.gravityDuration, mode, BuildImpulse(mode));
+            Game.Audio.SoundPlayer.Play("whoosh", 0.8f);
             ConsumeCharge();
 
             lastCast = target;
@@ -374,6 +375,7 @@ namespace Game.Player
             zeroGCharge = 0f;
             zeroGCooldownTimer = config.zeroGCooldown;
             GravityWorld.Instance.EnterZeroG(config.zeroGDuration);
+            Game.Audio.SoundPlayer.Play("zerog", 1f, 0f);
         }
 
         private void FocusCamera(Transform targetTransform)

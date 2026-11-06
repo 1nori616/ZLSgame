@@ -78,6 +78,7 @@ namespace Game.Effects
 
         private IEnumerator PopRoutine()
         {
+            Game.Audio.SoundPlayer.Play("death", 0.9f);
             CameraFollow cam = CameraFollow.Instance;
             if (cam != null) cam.Shake(shake);
 

@@ -125,6 +125,10 @@ namespace Game.Gravity
             float freeze = Mathf.Min(hitStopMax, hitStop + hitStopPerDamage * damage);
             Game.Effects.HitStop.Freeze(freeze);
 
+            // 音效：撞得狠用重砸音，普通用打击音
+            bool heavy = speed >= threshold * 2f;
+            Game.Audio.SoundPlayer.Play(heavy ? "slam" : "hit", heavy ? 1f : 0.85f);
+
         }
 
         private static void Shake(float amount)

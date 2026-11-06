@@ -72,6 +72,7 @@ namespace Game.EditorTools
             camGo.transform.position = new Vector3(width * 0.5f, height * 0.5f, -10f);
             camGo.AddComponent<Game.CameraSystem.CameraFollow>();
             camGo.AddComponent<Game.Effects.Vignette>();   // 锁定/失重的暗角效果
+            camGo.AddComponent<AudioListener>();           // 没有它整个场景都听不到声音
 
             // ---- 重力世界 ----
             var gwGo = new GameObject("GravityWorld");
