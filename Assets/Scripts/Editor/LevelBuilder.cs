@@ -50,10 +50,10 @@ namespace Game.EditorTools
             }
 
             string levelName = Path.GetFileNameWithoutExtension(path);
-            Build(lines, levelName);
+            Build(lines, levelName, path);
         }
 
-        private static void Build(string[] lines, string levelName)
+        private static void Build(string[] lines, string levelName, string levelPath)
         {
             int height = lines.Length;
             int width = 0;
@@ -156,11 +156,18 @@ namespace Game.EditorTools
             {
                 var p = (GameObject)PrefabUtility.InstantiatePrefab(playerPrefab);
                 p.transform.position = new Vector3(spawnPos.x, spawnPos.y, 0f);
+
+                // 自动补 HUD（预制体上可能没有）
+                if (p.GetComponent<Game.UI.PlayerHud>() == null)
+                    p.AddComponent<Game.UI.PlayerHud>();
             }
             else
             {
                 Debug.LogWarning("[LevelBuilder] 找不到 Assets/Prefabs/P_Player.prefab，场景里没有玩家。");
             }
+
+            // ---- 浮动提示文字 ----
+            CreateHints(levelPath, height);
 
             // ---- 相机对准玩家 ----
             camGo.transform.position = new Vector3(spawnPos.x, spawnPos.y + 1f, -10f);
@@ -176,6 +183,46 @@ namespace Game.EditorTools
             Debug.Log($"[LevelBuilder] 已生成 {scenePath}（{width}×{height} 格，{gridGo.name}）。终点：{(hasGoal ? "有" : "没有")}");
             EditorUtility.DisplayDialog("生成完成",
                 $"场景已生成：\n{scenePath}\n\n尺寸：{width} × {height}\n终点：{(hasGoal ? "有" : "没有")}", "好");
+        }
+
+        /// <summary>读取同名 .hints.txt（每行：x,y,文字），生成浮动提示。</summary>
+        private static void CreateHints(string levelPath, int height)
+        {
+            string hintPath = System.IO.Path.ChangeExtension(levelPath, null) + ".hints.txt";
+            if (!File.Exists(hintPath))
+            {
+                Debug.Log($"[LevelBuilder] 没有提示文件：{hintPath}（跳过）");
+                return;
+            }
+
+            var root = new GameObject("Hints");
+            string[] lines = File.ReadAllLines(hintPath);
+            int count = 0;
+
+            for (int i = 0; i < lines.Length; i++)
+            {
+                string line = lines[i].Trim();
+                if (line.Length == 0 || line.StartsWith("#")) continue;
+
+                // x,y,文字
+                int first = line.IndexOf(",");
+                int second = first >= 0 ? line.IndexOf(",", first + 1) : -1;
+                if (second < 0) continue;
+
+                if (!float.TryParse(line.Substring(0, first), out float x)) continue;
+                if (!float.TryParse(line.Substring(first + 1, second - first - 1), out float y)) continue;
+
+                string text = line.Substring(second + 1).Trim().Replace("\\n", "\n");
+                if (text.Length == 0) continue;
+
+                var go = new GameObject($"Hint_{count:00}");
+                go.transform.SetParent(root.transform, false);
+                go.transform.position = new Vector3(x + 0.5f, y + 0.5f, 0f);
+                go.AddComponent<Game.UI.LevelHint>().Setup(text, 9f);
+                count++;
+            }
+
+            Debug.Log($"[LevelBuilder] 生成 {count} 条浮动提示");
         }
 
         private static void Place(GameObject prefab, Vector3 pos, string label)

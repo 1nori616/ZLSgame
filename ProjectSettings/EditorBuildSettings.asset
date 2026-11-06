@@ -6,6 +6,15 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Scenes/Levels/Level_01.hints.unity
+    guid: c49efc112286a85429f2a72d264023cd
+  - enabled: 1
+    path: Assets/Scenes/Levels/Level_HurtTest.unity
+    guid: b1ba405901ee1d94dbe9767afa8dceb9
+  - enabled: 1
+    path: Assets/Scenes/Levels/Level_Test.unity
+    guid: 3e668384cbf09b24ea981d74e0b7b627
+  - enabled: 1
     path: Assets/Scenes/Levels/Level_01.unity
     guid: 718fc5eaa09ec5b48b5101fce539409a
   - enabled: 0

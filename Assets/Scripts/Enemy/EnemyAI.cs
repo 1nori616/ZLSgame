@@ -53,6 +53,8 @@ namespace Game.Enemy
         private float MaxJumpHeight => (jumpForce * jumpForce) / (2f * 9.81f * Mathf.Max(0.1f, gravityScale));
 
         [Header("受击")]
+        [Tooltip("受击动画播放时长")]
+        [SerializeField] private float hurtDuration = 0.12f;
         [SerializeField] private float stunDuration = 0.12f;
         [SerializeField] private float hurtShake = 0.2f;
 
@@ -74,6 +76,7 @@ namespace Game.Enemy
         private float climbTimer;
         private float stuckTimer;
         private int airJumps;
+        private float hurtTimer;
         private string currentState;   // 当前动画状态，避免每帧重复 Play
         private Vector2 lastPosition;
         private float facing = 1f;
@@ -154,6 +157,7 @@ namespace Game.Enemy
             if (State == EnemyState.Dead || rb == null) return;
 
             if (jumpTimer > 0f) jumpTimer -= Time.fixedDeltaTime;
+            if (hurtTimer > 0f) hurtTimer -= Time.fixedDeltaTime;
 
             int sign = Sign;
             bool falling = rb.velocity.y * sign < 0f;
@@ -183,10 +187,23 @@ namespace Game.Enemy
             UpdateAnimator();
         }
 
-        /// <summary>按水平速度切换待机 / 走路。</summary>
+        /// <summary>按状态切换动画：受击 &gt; 空中（上/下）&gt; 走路/待机。</summary>
         private void UpdateAnimator()
         {
             if (animator == null) return;
+
+            if (hurtTimer > 0f)
+            {
+                PlayState("Enemy_Hurt");
+                return;
+            }
+
+            if (!IsGrounded())
+            {
+                bool rising = rb.velocity.y * Sign > 0f;
+                PlayState(rising ? "Enemy_Jump" : "Enemy_Fall");
+                return;
+            }
 
             bool moving = Mathf.Abs(rb.velocity.x) > 0.2f;
             PlayState(moving ? "Enemy_Walk" : "Enemy_Idle");
@@ -288,15 +305,23 @@ namespace Game.Enemy
 
             int sign = Sign;
             Bounds b = body.bounds;
-            float y = sign > 0 ? b.min.y : b.max.y;
-            Vector2 origin = new Vector2(b.center.x, y);
 
-            RaycastHit2D hit = Physics2D.Raycast(origin, new Vector2(0f, -sign), 0.18f, groundLayer);
-            if (IsIgnorable(hit.collider) || hit.collider == body) return false;
+            // 用 OverlapBox 而不是射线：射线从碰撞体内部/贴地处出发经常打空，
+            // 会把"站着"误判成"空中"，表现就是贴地却一直播下落动画。
+            float footY = sign > 0 ? b.min.y : b.max.y;
+            Vector2 center = new Vector2(b.center.x, footY - sign * 0.04f);
+            Vector2 size = new Vector2(b.size.x * 0.8f, 0.12f);
 
-            // 只认“朝上”的面：贴着竖直墙时射线会打到墙侧面，
-            // 若把它当成地面，敌人就会在墙上连续起跳，看起来像踩着空气台阶往上爬。
-            return hit.normal.y * sign > 0.5f;
+            Collider2D[] hits = Physics2D.OverlapBoxAll(center, size, 0f, groundLayer);
+            for (int i = 0; i < hits.Length; i++)
+            {
+                Collider2D c = hits[i];
+                if (c == null || c == body || IsIgnorable(c)) continue;
+                if (c.transform.IsChildOf(transform)) continue;
+                return true;
+            }
+
+            return false;
         }
 
         private bool BlockedAhead()
@@ -322,6 +347,7 @@ namespace Game.Enemy
 
         private void HandleDamaged(DamageInfo info)
         {
+            hurtTimer = hurtDuration;
             stunTimer = Mathf.Max(stunTimer, stunDuration);
 
             CameraFollow cam = CameraFollow.Instance;

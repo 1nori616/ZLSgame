@@ -355,6 +355,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 4294967295
   jumpCooldown: 0.6
+  hurtDuration: 0.12
   stunDuration: 0.12
   hurtShake: 0.2
   spriteRenderer: {fileID: 0}
