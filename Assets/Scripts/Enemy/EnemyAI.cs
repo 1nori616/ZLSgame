@@ -35,6 +35,18 @@ namespace Game.Enemy
         [Tooltip("下落时的重力倍率，>1 落得更干脆")]
         [SerializeField] private float fallGravityMultiplier = 1.5f;
 
+        [Header("失重")]
+        [Tooltip("失重时敌人的移动能力，越小越迟钝（玩家是 0.45）")]
+        [Range(0.05f, 1f)]
+        [SerializeField] private float zeroGMoveScale = 0.25f;
+
+        [Header("调试")]
+        [SerializeField] private bool showDebug = false;
+
+        [Header("贴近玩家")]
+        [Tooltip("离玩家这么近就停下，避免一直往里挤")]
+        [SerializeField] private float stopDistance = 0.55f;
+
         [Header("跳跃")]
         [Tooltip("关掉后敌人只会在地面追，遇到台阶/墙就停下（最稳，不会爬墙）")]
         [SerializeField] private bool allowJump = false;
@@ -77,6 +89,7 @@ namespace Game.Enemy
         private float stuckTimer;
         private int airJumps;
         private float hurtTimer;
+        private float airStuckTimer;
         private string currentState;   // 当前动画状态，避免每帧重复 Play
         private Vector2 lastPosition;
         private float facing = 1f;
@@ -86,8 +99,14 @@ namespace Game.Enemy
 
         private int Sign => GravityWorld.Instance != null ? GravityWorld.Instance.Sign : 1;
 
+        private static readonly System.Collections.Generic.List<EnemyAI> allEnemies =
+            new System.Collections.Generic.List<EnemyAI>();
+
         private void Awake()
         {
+            // 敌人之间互相忽略碰撞：否则它们会挤成一团互相顶住，走不动也跳不起来
+            IgnoreOtherEnemies();
+
             rb = GetComponent<Rigidbody2D>();
             body = GetComponent<Collider2D>();
             gravity = GetComponent<GravityAffected>();
@@ -106,8 +125,58 @@ namespace Game.Enemy
             }
         }
 
+        private void IgnoreOtherEnemies()
+        {
+            Collider2D mine = GetComponent<Collider2D>();
+            if (mine == null) return;
+
+            for (int i = 0; i < allEnemies.Count; i++)
+            {
+                EnemyAI other = allEnemies[i];
+                if (other == null || other == this) continue;
+
+                Collider2D theirs = other.GetComponent<Collider2D>();
+                if (theirs == null) continue;
+
+                Physics2D.IgnoreCollision(mine, theirs, true);
+            }
+
+            allEnemies.Add(this);
+        }
+
+        private void OnGUI()
+        {
+            if (!showDebug) return;
+
+            Camera cam = Camera.main;
+            if (cam == null) return;
+
+            Vector3 sp = cam.WorldToScreenPoint(transform.position + Vector3.up * 1.4f);
+            if (sp.z < 0f) return;
+
+            bool grounded = IsGrounded();
+            bool blocked = BlockedAhead();
+            float step = ObstacleHeight();
+
+            string info =
+                $"{(grounded ? "地✓" : "地✗")} {(blocked ? "挡✓" : "挡✗")} " +
+                $"高={step:0.0} 跳={jumpTimer:0.0} 卡={stuckTimer:0.0} " +
+                $"速度={rb.velocity.x:0.0} 允许={allowJump}";
+
+            var style = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 18,
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleCenter,
+                normal = { textColor = Color.yellow }
+            };
+
+            GUI.Label(new Rect(sp.x - 260f, Screen.height - sp.y - 22f, 520f, 24f), info, style);
+        }
+
         private void OnDestroy()
         {
+            allEnemies.Remove(this);
             if (health != null)
             {
                 health.OnDamaged -= HandleDamaged;
@@ -167,22 +236,32 @@ namespace Game.Enemy
 
             bool chasing = State == EnemyState.Chase && (gravity == null || !gravity.IsOverridden);
 
-            float targetSpeed = chasing ? facing * moveSpeed : 0f;
+            bool tooClose = player != null &&
+                            Vector2.Distance(transform.position, player.position) < stopDistance;
+
+            // 失重时敌人比玩家更迟钝：移动速度和加速度都打折
+            bool zeroG = Game.Gravity.GravityWorld.Instance != null
+                         && Game.Gravity.GravityWorld.Instance.IsZeroG;
+            float controlScale = zeroG ? zeroGMoveScale : 1f;
+
+            float targetSpeed = chasing && !tooClose ? facing * moveSpeed * controlScale : 0f;
 
             if (climbTimer > 0f && chasing)
             {
                 // 攀爬期：强行保持向前速度，避免撞到箱子侧面被物理清零
-                rb.velocity = new Vector2(facing * moveSpeed, rb.velocity.y);
+                rb.velocity = new Vector2(facing * moveSpeed * controlScale, rb.velocity.y);
             }
             else
             {
                 // 空中的横向加速度更大，落点更准
-                float accel = IsGrounded() ? acceleration : acceleration * 3f;
+                float accel = (IsGrounded() ? acceleration : acceleration * 3f) * controlScale;
                 float newX = Mathf.MoveTowards(rb.velocity.x, targetSpeed, accel * Time.fixedDeltaTime);
                 rb.velocity = new Vector2(newX, rb.velocity.y);
             }
 
             if (chasing) DetectStuck();
+
+            EscapeIfWedged();
 
             UpdateAnimator();
         }
@@ -222,22 +301,39 @@ namespace Game.Enemy
             animator.Play(stateName, 0, 0f);
         }
 
+        /// <summary>卡在半空（钻进平台侧面）时脱困：推离墙面并让它落下去。</summary>
+        private void EscapeIfWedged()
+        {
+            bool almostStill = Mathf.Abs(rb.velocity.x) < 0.3f && Mathf.Abs(rb.velocity.y) < 0.3f;
+
+            if (almostStill && !IsGrounded()) airStuckTimer += Time.fixedDeltaTime;
+            else airStuckTimer = 0f;
+
+            if (airStuckTimer < 0.4f) return;
+
+            airStuckTimer = 0f;
+
+            // 反方向推开 + 轻微上抬，随后重力会把它拉下来
+            rb.velocity = new Vector2(-facing * 2.5f, 1.5f * Sign);
+            rb.WakeUp();
+        }
+
         /// <summary>追着追着几乎没位移 → 认为被卡住，直接跳。</summary>
         private void DetectStuck()
         {
-            Vector2 pos = transform.position;
-            float moved = Vector2.Distance(pos, lastPosition);
-            lastPosition = pos;
+            // 不看位移，看"有没有在动"：
+            // 敌人挤在一起互相推挤时位置一直在变，位移判定永远不成立，
+            // 但水平速度会一直很低——这才是真正的"走不动"。
+            bool blocked = Mathf.Abs(rb.velocity.x) < moveSpeed * 0.45f;
 
-            if (moved < 0.01f) stuckTimer += Time.fixedDeltaTime;
+            if (blocked) stuckTimer += Time.fixedDeltaTime;
             else stuckTimer = 0f;
 
-            if (stuckTimer > 0.25f)
+            if (stuckTimer > 0.3f)
             {
                 stuckTimer = 0f;
 
-                // 严格：只有站在地上才能跳。
-                // 只要允许空中起跳，贴着墙就能每 0.25 秒蹭一次，最终一定会爬上去。
+                // 只有站在地上才能跳，避免空中蹭着墙往上爬
                 if (allowJump && IsGrounded() && jumpTimer <= 0f) DoJump();
                 return;
             }
@@ -328,7 +424,27 @@ namespace Game.Enemy
         {
             if (body == null) return false;
 
+            int sign = Sign;
             Bounds b = body.bounds;
+
+            // 用脚前方的一块区域检测，而不是从身体中心打水平射线：
+            // 一格高的箱子比身体中心低，水平射线会从箱子顶上穿过去，
+            // 结果就是"被挡住却检测不到"，敌人永远不跳。
+            float footY = sign > 0 ? b.min.y : b.max.y;
+            // 提前 0.75 格发现障碍：留出起跳距离，避免"先撞上去推箱子再跳"
+            Vector2 boxCenter = new Vector2(b.center.x + facing * 0.75f, footY + sign * 0.35f);
+            Vector2 boxSize = new Vector2(0.45f, 0.8f);
+
+            Collider2D[] hits = Physics2D.OverlapBoxAll(boxCenter, boxSize, 0f, groundLayer);
+            for (int i = 0; i < hits.Length; i++)
+            {
+                Collider2D c = hits[i];
+                if (c == null || c == body || IsIgnorable(c)) continue;
+                if (c.transform.IsChildOf(transform)) continue;
+                return true;
+            }
+
+            // 兜底：更高处的墙
             Vector2 origin = new Vector2(b.center.x, b.center.y);
             RaycastHit2D hit = Physics2D.Raycast(origin, new Vector2(facing, 0f), wallCheckDistance, groundLayer);
             return !IsIgnorable(hit.collider) && hit.collider != body;

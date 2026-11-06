@@ -262,7 +262,7 @@ BoxCollider2D:
     adaptiveTiling: 0
   m_AutoTiling: 0
   serializedVersion: 2
-  m_Size: {x: 0.6, y: 0.9}
+  m_Size: {x: 0.5, y: 0.8}
   m_EdgeRadius: 0
 --- !u!114 &2309898699411879293
 MonoBehaviour:
@@ -347,7 +347,7 @@ MonoBehaviour:
   acceleration: 30
   gravityScale: 2
   fallGravityMultiplier: 1.5
-  allowJump: 0
+  allowJump: 1
   jumpForce: 11
   wallCheckDistance: 0.55
   ledgeCheckDistance: 0.7
