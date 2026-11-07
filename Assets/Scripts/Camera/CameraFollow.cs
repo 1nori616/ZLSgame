@@ -11,8 +11,12 @@ namespace Game.CameraSystem
         public static CameraFollow Instance { get; private set; }
 
         [SerializeField] private Transform target;
-        [SerializeField] private Vector3 offset = new Vector3(0f, 1.5f, -10f);
+        [SerializeField] private Vector3 offset = new Vector3(0f, 2.4f, -10f);
         [SerializeField] private float smoothTime = 0.12f;
+
+        [Header("边界")]
+        [Tooltip("镜头最低高度：低于这个值就锁住，避免露出地板下方的空白")]
+        [SerializeField] private float minCameraY = 4.2f;
 
         [Header("朝向预判")]
         [Tooltip("人物朝向哪边，镜头就往那边偏一点")]
@@ -67,6 +71,19 @@ namespace Game.CameraSystem
             if (Instance == this) Instance = null;
         }
 
+        /// <summary>把内部跟随位置直接挪到某个点，避免启用瞬间瞬移。</summary>
+        public void WarpTo(Vector3 position)
+        {
+            followPosition = position;
+            velocity = Vector3.zero;
+        }
+
+        /// <summary>临时改变跟随平滑时间（做镜头过渡用）。</summary>
+        public void SetSmoothTime(float time)
+        {
+            smoothTime = Mathf.Max(0.02f, time);
+        }
+
         /// <summary>触发震屏。amount 0~1，多次调用会叠加（有上限）。</summary>
         public void Shake(float amount)
         {
@@ -113,6 +130,10 @@ namespace Game.CameraSystem
 
             // 跟随只动"逻辑位置"，抖动单独叠加，避免抖动被平滑进跟随里
             followPosition = Vector3.SmoothDamp(followPosition, desired, ref velocity, smoothTime);
+
+            // 锁住最低高度，地板下方不会露白
+            if (followPosition.y < minCameraY)
+                followPosition.y = minCameraY;
 
             if (cam != null && cam.orthographic)
             {

@@ -13,7 +13,7 @@ GameObject:
   - component: {fileID: 7287527346290954225}
   m_Layer: 0
   m_Name: hurtbox
-  m_TagString: Untagged
+  m_TagString: Player
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -342,7 +342,7 @@ MonoBehaviour:
   motor: {fileID: 0}
   health: {fileID: 0}
   spriteRenderer: {fileID: 0}
-  showDebugHud: 1
+  showDebugHud: 0
   hitShake: 0.5
 --- !u!114 &1382508344971477782
 MonoBehaviour:
@@ -449,6 +449,8 @@ MonoBehaviour:
   pauseOnDeath: 1
   message: "\u4F60\u6B7B\u4E86"
   hint: "\u6309 R \u91CD\u65B0\u5F00\u59CB"
+  deathVignetteColor: {r: 0.75, g: 0.05, b: 0.08, a: 1}
+  deathVignetteAlpha: 0.85
 --- !u!114 &3371639881640081725
 MonoBehaviour:
   m_ObjectHideFlags: 0

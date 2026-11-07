@@ -31,6 +31,7 @@ namespace Game.Player
 
         /// <summary>当前播放的动画状态名，避免每帧重复 Play 导致动画卡在第一帧。</summary>
         private string currentState;
+        private GravityShift gravityShift;
 
         private void Awake()
         {
@@ -39,6 +40,7 @@ namespace Game.Player
             if (config == null && motor != null) config = motor.Config;
             if (animator == null) animator = GetComponentInChildren<Animator>();
             if (spriteRenderer == null) spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+            gravityShift = GetComponent<GravityShift>();
         }
 
         private void Update()
@@ -81,6 +83,13 @@ namespace Game.Player
                 spriteRenderer.flipX = (motor.Facing < 0f) ^ invertFacing;
 
             if (animator == null) return;
+
+            // 锁定目标（准备施放）时切到"抬手"姿势
+            if (gravityShift != null && gravityShift.HasManualLock)
+            {
+                PlayState("Player_Cast");
+                return;
+            }
 
             bool moving = Mathf.Abs(motor.HorizontalSpeed) > 0.2f;
             bool grounded = motor.IsGrounded;

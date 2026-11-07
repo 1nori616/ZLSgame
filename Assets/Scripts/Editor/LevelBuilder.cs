@@ -91,13 +91,28 @@ namespace Game.EditorTools
             Tilemap hazardMap = CreateTilemap(gridGo.transform, "Tilemap_Hazard", true);
             Tilemap decoMap = CreateTilemap(gridGo.transform, "Tilemap_Deco", false);
 
-            TileBase floorTile = GetOrCreateTile("Tile_Ground_00");
-            TileBase hazardTile = GetOrCreateTile("Tile_Ground_01");
+            // 载入 8 块地板贴图，按列号轮换，和美术给的横排图一致
+            TileBase[] floorTiles = new TileBase[8];
+            for (int i = 0; i < floorTiles.Length; i++)
+                floorTiles[i] = GetOrCreateTile($"Tile_Floor_{i:00}");
+
+            // 填充块：去掉顶边和发光边，可以竖直无缝堆叠
+            TileBase[] fillTiles = new TileBase[8];
+            for (int i = 0; i < fillTiles.Length; i++)
+                fillTiles[i] = GetOrCreateTile($"Tile_FloorFill_{i:00}");
+
+            // 浮空平台用的贴图（一层薄平台）
+            TileBase[] platTiles = new TileBase[8];
+            for (int i = 0; i < platTiles.Length; i++)
+                platTiles[i] = GetOrCreateTile($"Tile_Plat_{i:00}");
+
+            TileBase floorTile = floorTiles[0];
+            TileBase hazardTile = GetOrCreateTile("Tile_Floor_03");
 
             if (floorTile == null)
             {
                 EditorUtility.DisplayDialog("生成失败",
-                    $"找不到地砖贴图 Tile_Ground_00.png。\n已搜索：Assets/Art/Tiles 和 Assets/Art/Sprites", "好");
+                    $"找不到地砖贴图 Tile_Floor_00.png。\n已搜索：Assets/Art/Tiles 和 Assets/Art/Sprites", "好");
                 return;
             }
 
@@ -125,7 +140,36 @@ namespace Game.EditorTools
                     switch (c)
                     {
                         case Floor:
-                            floorMap.SetTile(cell, floorTile);
+                            // 这一列从当前格一直连到地图底部 → 实心地面/高台
+                            bool grounded = true;
+                            for (int k = row + 1; k < lines.Length; k++)
+                            {
+                                if (col >= lines[k].Length || lines[k][col] != Floor)
+                                {
+                                    grounded = false;
+                                    break;
+                                }
+                            }
+
+                            bool floorAbove = row > 0
+                                              && col < lines[row - 1].Length
+                                              && lines[row - 1][col] == Floor;
+
+                            int tileIdx = x % 8;
+
+                            if (!grounded)
+                            {
+                                if (!floorAbove)
+                                    floorMap.SetTile(cell, platTiles[tileIdx] ?? floorTile);
+                            }
+                            else if (floorAbove)
+                            {
+                                floorMap.SetTile(cell, fillTiles[tileIdx] ?? floorTile);
+                            }
+                            else
+                            {
+                                floorMap.SetTile(cell, floorTiles[tileIdx] ?? floorTile);
+                            }
                             break;
 
                         case Hazard:
@@ -178,6 +222,18 @@ namespace Game.EditorTools
             // ---- 浮动提示文字 ----
             CreateHints(levelPath, height);
 
+            // ---- 背景 + 舱门 ----
+            CreateBackground(cam, width, height, spawnPos);
+            CreateDoors(spawnPos, width, height, lines);
+
+            // ---- 连击计数 ----
+            var comboGo = new GameObject("ComboCounter");
+            comboGo.AddComponent<Game.Effects.ComboCounter>();
+
+            // ---- 开场演出 ----
+            var introGo = new GameObject("Intro");
+            introGo.AddComponent<Game.Level.IntroSequence>().Setup(spawnPos.x + 7f, 2.8f);
+
             // ---- 相机对准玩家 ----
             camGo.transform.position = new Vector3(spawnPos.x, spawnPos.y + 1f, -10f);
 
@@ -192,6 +248,90 @@ namespace Game.EditorTools
             Debug.Log($"[LevelBuilder] 已生成 {scenePath}（{width}×{height} 格，{gridGo.name}）。终点：{(hasGoal ? "有" : "没有")}");
             EditorUtility.DisplayDialog("生成完成",
                 $"场景已生成：\n{scenePath}\n\n尺寸：{width} × {height}\n终点：{(hasGoal ? "有" : "没有")}", "好");
+        }
+
+        /// <summary>星空背景 + 视差。</summary>
+        private static void CreateBackground(Camera cam, int width, int height, Vector2 spawnPos)
+        {
+            Sprite bg = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/Sprites/BG_Space.png");
+            if (bg == null)
+            {
+                Debug.LogWarning("[LevelBuilder] 找不到背景图 Assets/Art/Sprites/BG_Space.png");
+                return;
+            }
+
+            var root = new GameObject("Background");
+            // 放到出生点附近（相机初始位置），否则背景会停在关卡中心，玩家在起点看不到
+            root.transform.position = new Vector3(spawnPos.x, spawnPos.y + 2f, 20f);
+
+            float spriteW = bg.bounds.size.x;   // 世界单位
+            float spriteH = bg.bounds.size.y;
+
+            // 只按"相机高度"缩放，保证星星大小正常（之前按关卡宽度算，放大了 12 倍）
+            float camHeight = 6.5f * 2f;
+            float scale = (camHeight * 1.25f) / spriteH;
+            float scaledW = spriteW * scale;
+
+            // 横向平铺，铺满整关（视差移动时不会露出边缘）
+            int count = Mathf.CeilToInt((width + 40f) / scaledW) + 1;
+            for (int i = 0; i < count; i++)
+            {
+                var go = new GameObject($"BG_{i:00}");
+                go.transform.SetParent(root.transform, false);
+                go.transform.localScale = Vector3.one * scale;
+                go.transform.localPosition = new Vector3((i - count / 2) * scaledW, 0f, 0f);
+
+                var sr = go.AddComponent<SpriteRenderer>();
+                sr.sprite = bg;
+                sr.sortingOrder = -100;
+            }
+
+            root.AddComponent<Game.Effects.Parallax>().Setup(0.35f, 1f);
+        }
+
+        /// <summary>起点舱门（开→关）和终点舱门（关→开）。</summary>
+        private static void CreateDoors(Vector2 spawnPos, int width, int height, string[] lines)
+        {
+            Sprite startOpen = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/Sprites/Door_Start_Open.png");
+            Sprite startClose = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/Sprites/Door_Start_Close.png");
+            Sprite endClose = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/Sprites/Door_End_Close.png");
+            Sprite endOpen = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/Sprites/Door_End_Open.png");
+
+            // 起点门：放在玩家出生点左边一点
+            if (startOpen != null)
+            {
+                var go = new GameObject("Door_Start");
+                var sr = go.AddComponent<SpriteRenderer>();
+                sr.sortingOrder = -2;   // 放在玩家后面，主角从舱里走出来才看得见
+                const float doorScale = 2.1f;
+                go.transform.localScale = Vector3.one * doorScale;
+                float h = startOpen.bounds.size.y * doorScale;
+                go.transform.position = new Vector3(spawnPos.x, spawnPos.y - 0.2f + h * 0.5f, 0f);
+                go.AddComponent<Game.Level.DoorController>().Setup(
+                    Game.Level.DoorController.DoorMode.StartDoor, startOpen, startClose, 3.5f);
+            }
+
+            // 终点门：跟终点位置对齐
+            Vector2 goalPos = spawnPos;
+            for (int r = 0; r < lines.Length; r++)
+            {
+                int y = lines.Length - 1 - r;
+                for (int x = 0; x < lines[r].Length; x++)
+                    if (lines[r][x] == Goal) goalPos = new Vector2(x + 0.5f, y + 0.5f);
+            }
+
+            if (endClose != null)
+            {
+                var go = new GameObject("Door_End");
+                var sr = go.AddComponent<SpriteRenderer>();
+                sr.sortingOrder = -2;   // 放在玩家后面，主角从舱里走出来才看得见
+                const float endScale = 2.1f;
+                go.transform.localScale = Vector3.one * endScale;
+                float h2 = endClose.bounds.size.y * endScale;
+                go.transform.position = new Vector3(goalPos.x, goalPos.y - 0.5f + h2 * 0.5f, 0f);
+                go.AddComponent<Game.Level.DoorController>().Setup(
+                    Game.Level.DoorController.DoorMode.EndDoor, endClose, endOpen, 2.5f);
+            }
         }
 
         /// <summary>读取同名 .hints.txt（每行：x,y,文字），生成浮动提示。</summary>

@@ -14,6 +14,9 @@ namespace Game.Gravity
         [Tooltip("向下撞（地面、墙）的最低速度")]
         [SerializeField] private float minDownImpactSpeed = 6f;
 
+        [Tooltip("被甩出去的物体撞人时，物体自身要有多快才算伤害")]
+        [SerializeField] private float thrownImpactSpeed = 5.5f;
+
         [Tooltip("向上撞（天花板）的最低速度——反重力最高速通常只有 5，所以要更低")]
         [SerializeField] private float minUpImpactSpeed = 3.2f;
 
@@ -46,7 +49,13 @@ namespace Game.Gravity
         [Tooltip("撞天花板时的额外震屏（哪怕没掉血也给个反馈，可以设 0 关掉）")]
         [SerializeField] private float ceilingShake = 0.25f;
 
-        [Header("打击感")]
+        [Header("击退与顿帧")]
+        [Tooltip("沿撞击方向给被撞者的速度倍率")]
+        [SerializeField] private float knockbackScale = 0.55f;
+
+        [Tooltip("额外向上的击飞速度")]
+        [SerializeField] private float knockbackLift = 2.5f;
+
         [Tooltip("命中时的顿帧时长（秒），0.05~0.08 比较明显")]
         [SerializeField] private float hitStop = 0.06f;
 
@@ -93,6 +102,18 @@ namespace Game.Gravity
             bool isCeiling = collision.contactCount > 0 && collision.GetContact(0).normal.y < -0.5f;
 
             float threshold = isCeiling ? minUpImpactSpeed : minDownImpactSpeed;
+
+            if (otherThrown)
+            {
+                // 用"撞过来的物体"自己的速度判定：箱子只是被弹起又落下、速度很慢时不该算伤害
+                float otherSpeed = collision.rigidbody != null
+                    ? collision.rigidbody.velocity.magnitude
+                    : 0f;
+
+                speed = Mathf.Max(speed, otherSpeed);
+                threshold = thrownImpactSpeed;
+            }
+
             bool overThreshold = speed >= threshold;
 
             // 撞天花板即使没到伤害阈值，也给一点震动反馈
@@ -117,17 +138,41 @@ namespace Game.Gravity
             DamageInfo info = new DamageInfo(damage, Vector2.zero, gameObject);
             damageable.TakeDamage(in info);
 
-            if (Game.Effects.ComboCounter.Instance != null)
-                Game.Effects.ComboCounter.Instance.AddHit();
+            Game.Effects.ComboCounter.Hit();
+
+            // 击退：沿"从撞击者指向被撞者"的方向推出去
+            Rigidbody2D targetRb = collision.collider.attachedRigidbody;
+            if (targetRb != null && !targetRb.isKinematic)
+            {
+                Vector2 pushDir = ((Vector2)collision.transform.position - (Vector2)transform.position).normalized;
+                if (pushDir.sqrMagnitude < 0.01f) pushDir = Vector2.up;
+                targetRb.velocity = pushDir * (speed * knockbackScale) + Vector2.up * knockbackLift;
+                targetRb.WakeUp();
+            }
+
+            // 命中火花：小冲击波，让"碰到了"有视觉反馈
+            if (collision.contactCount > 0)
+            {
+                Vector2 point = collision.GetContact(0).point;
+                Game.Effects.ShockwaveRing.Spawn(point, 0.7f, 0.14f, new Color(1f, 0.95f, 0.7f, 0.95f));
+            }
 
             Shake(hitShake + shakePerDamage * damage);
 
             float freeze = Mathf.Min(hitStopMax, hitStop + hitStopPerDamage * damage);
             Game.Effects.HitStop.Freeze(freeze);
 
-            // 音效：撞得狠用重砸音，普通用打击音
+            // 音效：重击用 slam，普通命中用 hit，并叠一层低音增加分量
             bool heavy = speed >= threshold * 2f;
-            Game.Audio.SoundPlayer.Play(heavy ? "slam" : "hit", heavy ? 1f : 0.85f);
+            if (heavy)
+            {
+                Game.Audio.SoundPlayer.Play("slam", 1f);
+            }
+            else
+            {
+                Game.Audio.SoundPlayer.Play("hit", 1f);
+                Game.Audio.SoundPlayer.Play("slam", 0.35f);   // 垫一层低频，听起来更"沉"
+            }
 
         }
 

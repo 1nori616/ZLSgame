@@ -28,6 +28,9 @@ namespace Game.Effects
         private float alpha;
         private float targetAlpha;
 
+        /// <summary>锁定时忽略所有"关闭"请求（死亡暗角用）。</summary>
+        public bool Locked { get; set; }
+
         private void Awake()
         {
             Instance = this;
@@ -43,11 +46,13 @@ namespace Game.Effects
         /// <summary>开关暗角。</summary>
         public void SetActive(bool on)
         {
+            if (Locked && !on) return;
             targetAlpha = on ? maxAlpha : 0f;
         }
 
         public void SetActive(bool on, float customAlpha)
         {
+            if (Locked && !on) return;
             maxAlpha = Mathf.Clamp01(customAlpha);
             targetAlpha = on ? maxAlpha : 0f;
         }
@@ -55,6 +60,7 @@ namespace Game.Effects
         /// <summary>带颜色的暗角：失重时用淡蓝，瞄准锁定时用黑。</summary>
         public void SetActive(bool on, float customAlpha, Color tint)
         {
+            if (Locked && !on) return;
             color = tint;
             maxAlpha = Mathf.Clamp01(customAlpha);
             targetAlpha = on ? maxAlpha : 0f;

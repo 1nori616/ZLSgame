@@ -60,7 +60,10 @@ namespace Game.Player
             // 红色暗角：先暂停再开，暗角本身用真实时间淡入
             if (pauseOnDeath) Time.timeScale = 0f;
             if (vignette != null)
+            {
+                vignette.Locked = true;   // 防止其它系统把死亡暗角关掉
                 vignette.SetActive(true, deathVignetteAlpha, deathVignetteColor);
+            }
         }
 
         private void Update()

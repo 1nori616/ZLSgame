@@ -316,6 +316,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   minDownImpactSpeed: 8
+  thrownImpactSpeed: 5.5
   minUpImpactSpeed: 3.2
   baseDamage: 1
   damagePerSpeed: 6
@@ -326,6 +327,8 @@ MonoBehaviour:
   hitShake: 0.25
   shakePerDamage: 0.1
   ceilingShake: 0.25
+  knockbackScale: 0.55
+  knockbackLift: 2.5
   hitStop: 0.06
   hitStopPerDamage: 0.01
   hitStopMax: 0.12
@@ -347,6 +350,9 @@ MonoBehaviour:
   acceleration: 30
   gravityScale: 2
   fallGravityMultiplier: 1.5
+  zeroGMoveScale: 0.25
+  showDebug: 0
+  stopDistance: 0.55
   allowJump: 1
   jumpForce: 11
   wallCheckDistance: 0.55
@@ -453,8 +459,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   health: {fileID: 0}
-  duration: 0.28
+  killSlowScale: 0.12
+  killSlowDuration: 0.16
+  killFreezeDuration: 0.06
   bulge: 1.4
+  duration: 0.28
   flashColor: {r: 1, g: 1, b: 1, a: 1}
   shake: 0.55
   ringRadius: 1.8
