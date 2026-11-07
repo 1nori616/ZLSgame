@@ -7,7 +7,10 @@ using UnityEngine;
 namespace Game.Effects
 {
     /// <summary>
-    /// 击杀表现：敌人死亡时先"涨一下"再缩没，同时闪白、掉落冲击波、震屏。
+    /// 击杀表现：
+    ///   ① 瞬间进入慢动作（世界几乎停住）
+    ///   ② 短暂完全定格
+    ///   ③ 敌人膨胀 → 炸开（冲击波 + 震屏）
     /// 挂在敌人身上（需要同物体有 Health）。
     /// </summary>
     [RequireComponent(typeof(Health))]
@@ -15,17 +18,28 @@ namespace Game.Effects
     {
         [SerializeField] private Health health;
 
-        [Tooltip("整个消失过程的时长")]
-        [SerializeField] private float duration = 0.28f;
+        [Header("慢动作")]
+        [Tooltip("击杀瞬间把时间放慢到多少倍")]
+        [SerializeField] private float killSlowScale = 0.12f;
 
-        [Tooltip("先膨胀到多少倍")]
-        [SerializeField] private float bulge = 1.4f;
+        [Tooltip("慢动作持续多久（真实时间）")]
+        [SerializeField] private float killSlowDuration = 0.16f;
+
+        [Tooltip("紧接着的完全定格时长（真实时间）")]
+        [SerializeField] private float killFreezeDuration = 0.06f;
+
+        [Header("炸开")]
+        [Tooltip("膨胀到多少倍后炸开")]
+        [SerializeField] private float bulge = 1.5f;
+
+        [Tooltip("从膨胀到消失的时长（真实时间）")]
+        [SerializeField] private float duration = 0.3f;
 
         [SerializeField] private Color flashColor = Color.white;
 
         [Header("反馈")]
-        [SerializeField] private float shake = 0.55f;
-        [SerializeField] private float ringRadius = 1.8f;
+        [SerializeField] private float shake = 0.7f;
+        [SerializeField] private float ringRadius = 2.2f;
 
         private SpriteRenderer[] renderers;
         private Color[] originalColors;
@@ -55,7 +69,6 @@ namespace Game.Effects
             if (dying) return;
             dying = true;
 
-            // 停掉它的行动，避免尸体还在追人
             Enemy.EnemyAI ai = GetComponent<Enemy.EnemyAI>();
             if (ai != null) ai.enabled = false;
 
@@ -78,26 +91,52 @@ namespace Game.Effects
 
         private IEnumerator PopRoutine()
         {
-            Game.Audio.SoundPlayer.Play("death", 0.9f);
+            // 记住原来的时间流速（可能正处于瞄准慢动作里）
+            float restoreScale = Time.timeScale > 0.05f ? Time.timeScale : 1f;
+
+            // ① 慢动作
+            Time.timeScale = killSlowScale;
+            float t = 0f;
+            while (t < killSlowDuration)
+            {
+                t += Time.unscaledDeltaTime;
+                yield return null;
+            }
+
+            // ② 完全定格
+            Time.timeScale = 0f;
+            t = 0f;
+            while (t < killFreezeDuration)
+            {
+                t += Time.unscaledDeltaTime;
+                yield return null;
+            }
+
+            // ③ 炸开：时间稍微恢复，让冲击波看得见
+            Time.timeScale = Mathf.Min(restoreScale, 0.6f);
+
+            Game.Audio.SoundPlayer.Play("death", 1f);
+
             CameraFollow cam = CameraFollow.Instance;
             if (cam != null) cam.Shake(shake);
 
-            ShockwaveRing.Spawn(transform.position, ringRadius, 0.3f, new Color(1f, 0.9f, 0.6f, 0.9f));
+            ShockwaveRing.Spawn(transform.position, ringRadius, 0.28f, new Color(1f, 0.95f, 0.7f, 1f));
+            ShockwaveRing.Spawn(transform.position, ringRadius * 0.55f, 0.18f, new Color(1f, 0.6f, 0.4f, 0.9f));
 
-            float t = 0f;
+            t = 0f;
             while (t < duration)
             {
                 t += Time.unscaledDeltaTime;
                 float k = Mathf.Clamp01(t / duration);
 
-                // 0~0.3 鼓起来，0.3~1 缩到 0
-                float scale = k < 0.3f
-                    ? Mathf.Lerp(1f, bulge, k / 0.3f)
-                    : Mathf.Lerp(bulge, 0f, (k - 0.3f) / 0.7f);
+                // 0~0.25 迅速鼓起来，之后炸开缩到 0
+                float scale = k < 0.25f
+                    ? Mathf.Lerp(1f, bulge, k / 0.25f)
+                    : Mathf.Lerp(bulge, 0f, (k - 0.25f) / 0.75f);
 
                 transform.localScale = originalScale * scale;
 
-                float alpha = 1f - Mathf.Pow(k, 3f);
+                float alpha = 1f - Mathf.Pow(k, 2.2f);
                 for (int i = 0; i < renderers.Length; i++)
                 {
                     if (renderers[i] == null) continue;
@@ -109,6 +148,7 @@ namespace Game.Effects
                 yield return null;
             }
 
+            Time.timeScale = restoreScale;
             Destroy(gameObject);
         }
     }

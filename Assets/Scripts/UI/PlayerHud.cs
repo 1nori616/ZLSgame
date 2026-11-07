@@ -15,6 +15,12 @@ namespace Game.UI
         [SerializeField] private float healthHeight = 14f;
         [SerializeField] private bool showHealthNumber;
 
+        [Tooltip("血条分几段（每段之间有间隙）")]
+        [SerializeField] private int segments = 5;
+
+        [Tooltip("段与段之间的间隙")]
+        [SerializeField] private float segmentGap = 3f;
+
         [Header("充能方块")]
         [SerializeField] private float pipSize = 10f;
         [SerializeField] private float pipGap = 5f;
@@ -50,14 +56,26 @@ namespace Game.UI
             int max = Mathf.Max(1, playerHealth.Health.Max);
             float ratio = Mathf.Clamp01(cur / (float)max);
 
-            Rect back = new Rect(origin.x, origin.y, healthWidth, healthHeight);
-            Rect fill = new Rect(origin.x, origin.y, healthWidth * ratio, healthHeight);
-
-            DrawRect(back, barBack);
+            int seg = Mathf.Max(1, segments);
+            float segWidth = (healthWidth - segmentGap * (seg - 1)) / seg;
 
             // 血少时偏橙
             Color c = ratio > 0.3f ? barFill : Color.Lerp(barLow, barFill, ratio / 0.3f);
-            DrawRect(fill, c);
+
+            for (int i = 0; i < seg; i++)
+            {
+                float x = origin.x + i * (segWidth + segmentGap);
+                Rect back = new Rect(x, origin.y, segWidth, healthHeight);
+                DrawRect(back, barBack);
+
+                // 这一段应该填多少（0~1）
+                float segStart = i / (float)seg;
+                float segEnd = (i + 1) / (float)seg;
+                float amount = Mathf.Clamp01((ratio - segStart) / (segEnd - segStart));
+
+                if (amount > 0f)
+                    DrawRect(new Rect(x, origin.y, segWidth * amount, healthHeight), c);
+            }
 
             if (showHealthNumber)
             {

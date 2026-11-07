@@ -90,7 +90,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 56437fcb56d381d43abfb12ecfcf4a1b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  amount: 1
+  amount: 20
   knockback: {x: 7, y: 6}
   destroyAfterHit: 0
 --- !u!1 &8222695250118828418
@@ -373,7 +373,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 56437fcb56d381d43abfb12ecfcf4a1b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  amount: 1
+  amount: 20
   knockback: {x: 7, y: 6}
   destroyAfterHit: 0
 --- !u!114 &214328374384676228

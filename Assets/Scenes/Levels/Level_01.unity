@@ -721,6 +721,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: P_Player
       objectReference: {fileID: 0}
+    - target: {fileID: 4899199285718013758, guid: 642a4595f7d733848bc018988344e032, type: 3}
+      propertyPath: showDebugHud
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 5389666927975541992, guid: 642a4595f7d733848bc018988344e032, type: 3}
       propertyPath: m_LocalPosition.x
       value: 2.5
@@ -798,6 +802,8 @@ MonoBehaviour:
   healthWidth: 180
   healthHeight: 14
   showHealthNumber: 0
+  segments: 5
+  segmentGap: 3
   pipSize: 10
   pipGap: 5
   pipTopGap: 7

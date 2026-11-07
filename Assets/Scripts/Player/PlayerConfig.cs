@@ -33,7 +33,7 @@ namespace Game.Player
         public float gravityDuration = 2f;
 
         [Tooltip("最多攒几格充能")]
-        public int gravityCharges = 3;
+        public int gravityCharges = 5;
 
         [Tooltip("每恢复一格充能需要几秒")]
         public float gravityRechargeTime = 1.2f;

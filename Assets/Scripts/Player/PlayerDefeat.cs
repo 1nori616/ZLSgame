@@ -18,7 +18,16 @@ namespace Game.Player
         [SerializeField] private string message = "你死了";
         [SerializeField] private string hint = "按 R 重新开始";
 
+        [Header("死亡画面")]
+        [Tooltip("死亡时四周的暗角颜色")]
+        [SerializeField] private Color deathVignetteColor = new Color(0.75f, 0.05f, 0.08f);
+
+        [Tooltip("暗角浓度")]
+        [Range(0f, 1f)]
+        [SerializeField] private float deathVignetteAlpha = 0.85f;
+
         private bool dead;
+        private Game.Effects.Vignette vignette;
 
         private void Awake()
         {
@@ -30,6 +39,9 @@ namespace Game.Player
             // 放在 Start：等 PlayerHealth 的 Awake 跑完，Health 才有值
             if (playerHealth != null && playerHealth.Health != null)
                 playerHealth.Health.OnDied += HandleDied;
+
+            if (Camera.main != null)
+                vignette = Camera.main.GetComponent<Game.Effects.Vignette>();
         }
 
         private void OnDestroy()
@@ -44,7 +56,11 @@ namespace Game.Player
             dead = true;
 
             Debug.Log("[PlayerDefeat] 玩家死亡");
+
+            // 红色暗角：先暂停再开，暗角本身用真实时间淡入
             if (pauseOnDeath) Time.timeScale = 0f;
+            if (vignette != null)
+                vignette.SetActive(true, deathVignetteAlpha, deathVignetteColor);
         }
 
         private void Update()
@@ -56,6 +72,7 @@ namespace Game.Player
 
             if (Input.GetKeyDown(KeyCode.R))
             {
+                if (vignette != null) vignette.SetActive(false);
                 Time.timeScale = 1f;
                 SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
             }

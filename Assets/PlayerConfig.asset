@@ -25,7 +25,7 @@ MonoBehaviour:
   dashDuration: 0.15
   dashCooldown: 0.5
   gravityDuration: 2
-  gravityCharges: 3
+  gravityCharges: 5
   gravityRechargeTime: 1.2
   cameraFocusDuration: 1.2
   selfAntiAcceleration: 16
