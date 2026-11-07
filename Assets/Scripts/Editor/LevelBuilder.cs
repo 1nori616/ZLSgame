@@ -51,7 +51,13 @@ namespace Game.EditorTools
                 return;
             }
 
-            string levelName = Path.GetFileNameWithoutExtension(path);
+                        if (path.EndsWith(".hints.txt"))
+            {
+                EditorUtility.DisplayDialog("选错文件了",
+                    "这是提示文件，不是地图文件。\n请选择同目录下的 Level_XX.txt。", "好");
+                return;
+            }
+string levelName = Path.GetFileNameWithoutExtension(path);
             Build(lines, levelName, path);
         }
 
