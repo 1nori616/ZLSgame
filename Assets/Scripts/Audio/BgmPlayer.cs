@@ -11,9 +11,9 @@ namespace Game.Audio
     {
         public static BgmPlayer Instance { get; private set; }
 
-        [Tooltip("背景音量：一定要比音效低，建议 0.2~0.3")]
+        [Tooltip("背景音乐音量")]
         [Range(0f, 1f)]
-        public static float Volume = 0.25f;
+        public static float Volume = 0.7f;
 
         [Tooltip("淡入时长（秒）")]
         [SerializeField] private float fadeInTime = 1.5f;

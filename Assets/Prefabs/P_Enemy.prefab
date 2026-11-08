@@ -295,9 +295,10 @@ MonoBehaviour:
   chainWindow: 2.5
   antiAcceleration: 14
   antiMaxSpeed: 5
-  heavyAcceleration: 45
+  heavyAcceleration: 58
   heavyMaxSpeed: 24
-  throwDrag: 18
+  throwDrag: 7
+  antiGravityMaxRise: 3
   groundLayer:
     serializedVersion: 2
     m_Bits: 4294967295

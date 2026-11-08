@@ -36,7 +36,19 @@ namespace Game.Gravity
 
         private Rigidbody2D rb;
         private Collider2D body;
+        [Tooltip("被反重力抬起时，最多升高多少格（超过就停在半空飘着）")]
+        [SerializeField] private float antiGravityMaxRise = 3f;
+
         private float overrideTimer;
+        private float hoverStartY;
+
+        [Tooltip("浮空时的上下浮动幅度")]
+        [SerializeField] private float hoverBobAmount = 0.6f;
+
+        [Tooltip("浮空时的浮动速度")]
+        [SerializeField] private float hoverBobSpeed = 2.6f;
+
+        private float hoverPhase;
         private float lastCastTime = -999f;
 
         public bool IsOverridden => overrideTimer > 0f;
@@ -116,6 +128,16 @@ namespace Game.Gravity
 
             float vy = Mathf.Clamp(rb.velocity.y + accel * Time.fixedDeltaTime, -maxSpeed, maxSpeed);
 
+            // 反重力：升到允许高度后停在半空，带轻微上下浮动（不僵硬）
+            if (LastMode == GravityMode.AntiGravity && sign > 0)
+            {
+                if (rb.position.y - hoverStartY >= antiGravityMaxRise)
+                {
+                    float bob = Mathf.Sin(Time.time * hoverBobSpeed + hoverPhase) * hoverBobAmount;
+                    vy = bob;
+                }
+            }
+
             // 横向速度逐渐衰减，让"甩出去"有距离感，而不是一直飞
             float vx = Mathf.MoveTowards(rb.velocity.x, 0f, throwDrag * Time.fixedDeltaTime);
 
@@ -142,6 +164,8 @@ namespace Game.Gravity
 
             overrideTimer = Mathf.Max(0.01f, duration);
             rb.gravityScale = 0f;
+            hoverStartY = rb.position.y;   // 记录起始高度，用来限制上升
+            hoverPhase = UnityEngine.Random.Range(0f, 6.28f);   // 随机相位，避免多个敌人同步浮动
 
             if (impulse != Vector2.zero)
                 rb.velocity = new Vector2(impulse.x, impulse.y);

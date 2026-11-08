@@ -138,7 +138,8 @@ namespace Game.Enemy
                 Collider2D theirs = other.GetComponent<Collider2D>();
                 if (theirs == null) continue;
 
-                Physics2D.IgnoreCollision(mine, theirs, true);
+                // 恢复碰撞：敌人之间会互相推挤，也能用敌人砸敌人
+                Physics2D.IgnoreCollision(mine, theirs, false);
             }
 
             allEnemies.Add(this);
@@ -224,6 +225,13 @@ namespace Game.Enemy
         private void FixedUpdate()
         {
             if (State == EnemyState.Dead || rb == null) return;
+
+            // 被重力甩飞期间完全交给物理，AI 不许改速度（否则会被"拽住"甩不动）
+            if (gravity != null && gravity.IsOverridden)
+            {
+                if (animator != null) UpdateAnimator();
+                return;
+            }
 
             if (jumpTimer > 0f) jumpTimer -= Time.fixedDeltaTime;
             if (hurtTimer > 0f) hurtTimer -= Time.fixedDeltaTime;

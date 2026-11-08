@@ -12,7 +12,7 @@ namespace Game.Audio
     public class SoundPlayer : MonoBehaviour
     {
         /// <summary>总音量，0~1。</summary>
-        public static float MasterVolume = 0.8f;
+        public static float MasterVolume = 0.55f;
 
         private const int PoolSize = 6;
         private const string ResourceFolder = "SFX/";

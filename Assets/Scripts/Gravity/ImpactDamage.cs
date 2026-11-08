@@ -138,7 +138,9 @@ namespace Game.Gravity
             DamageInfo info = new DamageInfo(damage, Vector2.zero, gameObject);
             damageable.TakeDamage(in info);
 
-            Game.Effects.ComboCounter.Hit();
+            // 自己受伤不算连击
+            if (!(damageable is Game.Player.PlayerHealth))
+                Game.Effects.ComboCounter.Hit();
 
             // 击退：沿"从撞击者指向被撞者"的方向推出去
             Rigidbody2D targetRb = collision.collider.attachedRigidbody;

@@ -46,6 +46,10 @@ namespace Game.Effects
         private Vector3 originalScale;
         private bool dying;
 
+        // 多个敌人同时死亡时，共享同一次慢动作：谁最后结束谁负责恢复时间
+        private static int activeSlowMotions;
+        private static float savedScale = 1f;
+
         private void Awake()
         {
             if (health == null) health = GetComponent<Health>();
@@ -91,8 +95,12 @@ namespace Game.Effects
 
         private IEnumerator PopRoutine()
         {
-            // 记住原来的时间流速（可能正处于瞄准慢动作里）
-            float restoreScale = Time.timeScale > 0.05f ? Time.timeScale : 1f;
+            // 第一个进入的记住原始时间流速，后面的共享（避免互相覆盖导致卡在慢动作）
+            if (activeSlowMotions == 0)
+                savedScale = Time.timeScale > 0.05f ? Time.timeScale : 1f;
+            activeSlowMotions++;
+
+            float restoreScale = savedScale;
 
             // ① 慢动作
             Time.timeScale = killSlowScale;
@@ -148,7 +156,11 @@ namespace Game.Effects
                 yield return null;
             }
 
-            Time.timeScale = restoreScale;
+            // 最后一个结束的才恢复时间，其余交给它
+            activeSlowMotions = Mathf.Max(0, activeSlowMotions - 1);
+            if (activeSlowMotions == 0)
+                Time.timeScale = restoreScale;
+
             Destroy(gameObject);
         }
     }

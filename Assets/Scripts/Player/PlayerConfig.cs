@@ -33,7 +33,7 @@ namespace Game.Player
         public float gravityDuration = 2f;
 
         [Tooltip("最多攒几格充能")]
-        public int gravityCharges = 5;
+        public int gravityCharges = 8;
 
         [Tooltip("每恢复一格充能需要几秒")]
         public float gravityRechargeTime = 1.2f;
@@ -50,7 +50,7 @@ namespace Game.Player
 
         [Header("失重（按住 F 蓄力）")]
         [Tooltip("需要按住多久才触发")]
-        public float zeroGChargeTime = 1.5f;
+        public float zeroGChargeTime = 0.5f;
 
         [Tooltip("失重持续时间（秒）")]
         public float zeroGDuration = 6f;
@@ -70,7 +70,10 @@ namespace Game.Player
 
         [Header("对自己施放（R）")]
         public float selfAntiAcceleration = 16f;
-        public float selfAntiMaxSpeed = 6f;
+        public float selfAntiMaxSpeed = 4f;
+
+        [Tooltip("自锁时最多能升高多少格")]
+        public float selfAntiMaxHeight = 5f;
 
         [Header("施放判定")]
         [Tooltip("以玩家为中心的搜索半径（前后都能选中）")]

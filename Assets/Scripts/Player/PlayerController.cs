@@ -41,6 +41,10 @@ namespace Game.Player
             if (animator == null) animator = GetComponentInChildren<Animator>();
             if (spriteRenderer == null) spriteRenderer = GetComponentInChildren<SpriteRenderer>();
             gravityShift = GetComponent<GravityShift>();
+
+            // 冲刺尾迹：自动挂载，不需要手动配置
+            if (GetComponent<Game.Effects.PlayerTrail>() == null)
+                gameObject.AddComponent<Game.Effects.PlayerTrail>();
         }
 
         private void Update()

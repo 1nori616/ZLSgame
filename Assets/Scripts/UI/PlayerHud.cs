@@ -32,6 +32,7 @@ namespace Game.UI
         [SerializeField] private Color barLow = new Color(0.98f, 0.52f, 0.12f);
         [SerializeField] private Color pipReady = new Color(0.95f, 0.85f, 0.35f);
         [SerializeField] private Color pipEmpty = new Color(1f, 1f, 1f, 0.18f);
+        [SerializeField] private Color pipDenied = new Color(1f, 0.25f, 0.2f);
 
         private Player.PlayerHealth playerHealth;
         private Player.GravityShift gravityShift;
@@ -98,10 +99,28 @@ namespace Game.UI
 
             float y = origin.y + healthHeight + pipTopGap;
 
+            // 锁定自己但充能不够 → 方块闪红提示"放不了"
+            bool insufficient = gravityShift.IsSelfLocked && have < gravityShift.SelfChargeCost;
+            float blink = 0.55f + 0.45f * Mathf.Sin(Time.unscaledTime * 10f);
+
             for (int i = 0; i < max; i++)
             {
                 var r = new Rect(origin.x + i * (pipSize + pipGap), y, pipSize, pipSize);
-                DrawRect(r, i < have ? pipReady : pipEmpty);
+
+                Color c;
+                if (insufficient)
+                {
+                    bool needed = i < gravityShift.SelfChargeCost;
+                    c = needed
+                        ? new Color(pipDenied.r, pipDenied.g, pipDenied.b, blink)
+                        : (i < have ? pipReady : pipEmpty);
+                }
+                else
+                {
+                    c = i < have ? pipReady : pipEmpty;
+                }
+
+                DrawRect(r, c);
             }
         }
 

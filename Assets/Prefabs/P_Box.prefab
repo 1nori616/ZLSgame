@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 6808364092120957531}
   - component: {fileID: 1562459972357459529}
   - component: {fileID: 3727160247130403721}
+  - component: {fileID: 5150505050505050505}
   m_Layer: 0
   m_Name: P_Box
   m_TagString: Untagged
@@ -30,7 +31,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 3.03, y: -3.09, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 1.35, y: 1.35, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -175,11 +176,30 @@ MonoBehaviour:
   chainWindow: 2.5
   antiAcceleration: 14
   antiMaxSpeed: 5
-  heavyAcceleration: 45
+  heavyAcceleration: 58
   heavyMaxSpeed: 24
-  throwDrag: 18
+  throwDrag: 7
+  antiGravityMaxRise: 6
   groundLayer:
     serializedVersion: 2
     m_Bits: 4294967295
   groundCheckWidthScale: 0.9
   groundCheckDistance: 0.06
+
+--- !u!114 &5150505050505050505
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2961358396378499372}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7910264f730248e1a8a71c7767dd2dc6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  triggerSpeed: 4.5
+  radius: 2.4
+  damage: 35
+  knockback: 9
+  knockbackLift: 4

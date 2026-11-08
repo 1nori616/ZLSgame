@@ -33,6 +33,24 @@ namespace Game.Player
         private int charges;
         private float rechargeTimer;
         private float flipCooldownTimer;
+        [Tooltip("对自己施放要消耗几格充能")]
+        [SerializeField] private int selfChargeCost = 4;   // 最少 4 格
+
+        [Tooltip("自锁之后的冷却时间（秒），防止反复逃课")]
+        [SerializeField] private float selfCastCooldown = 6f;
+
+        private float selfCastCooldownTimer;
+
+        [Tooltip("鼠标瞄准灵敏度：越大越容易甩出大角度（1 = 原始）")]
+        [Range(0.3f, 3f)]
+        [SerializeField] private float aimSensitivity = 1.6f;
+
+        [Tooltip("鼠标离角色小于这个距离时，沿用上一次的方向，避免乱抖")]
+        [SerializeField] private float aimDeadZone = 1.2f;
+
+        private Vector2 lastAim = Vector2.right;
+        private Vector2 lastPointer;      // 最近一次鼠标屏幕坐标（E 的甩出方向用它）
+
         private float zeroGCharge;
         private bool zeroGVisualOn;
         private Game.Gravity.GravityAffected selfGravity;
@@ -59,6 +77,12 @@ namespace Game.Player
         public GravityAffected LockedTarget => IsValid(manualLock) ? manualLock : (IsValid(lastCast) ? lastCast : null);
         public bool HasManualLock => IsValid(manualLock);
 
+        /// <summary>当前锁定的是不是自己。</summary>
+        public bool IsSelfLocked => IsValid(manualLock) && manualLock == selfGravity;
+
+        /// <summary>自锁需要多少格充能。</summary>
+        public int SelfChargeCost => Mathf.Max(4, selfChargeCost);
+
         private void Awake()
         {
             if (input == null) input = GetComponent<PlayerInput>();
@@ -79,11 +103,14 @@ namespace Game.Player
         {
             if (config == null || input == null) return;
 
+            if (selfCastCooldownTimer > 0f) selfCastCooldownTimer -= Time.deltaTime;
+
             TickRecharge();
             TickTimers();
 
             PlayerInputData data = input.Read();
 
+            lastPointer = data.Pointer;
             if (data.ClickDown) LockByPointer(data.Pointer);
             if (data.AntiDown) TryCastOnTarget(GravityMode.AntiGravity);
             if (data.HeavyDown) TryCastOnTarget(GravityMode.Heavy);
@@ -310,6 +337,11 @@ namespace Game.Player
 
             GravityAffected target = manualLock;
 
+            // 自锁需要足够充能，不够就不放
+            int selfCost = Mathf.Max(4, selfChargeCost);
+            if (target == selfGravity && charges < selfCost) return false;
+            if (target == selfGravity && selfCastCooldownTimer > 0f) return false;
+
             if (target == selfGravity)
             {
                 // 对自己施放：走 PlayerMotor 的通道，不碰别人的 GravityAffected
@@ -321,9 +353,9 @@ namespace Game.Player
                 }
                 else
                 {
-                    // 往上飘
+                    // 往上飘：限制最大升高；不 Stamp，落地不算"被甩摔伤"
+                    motor.StartSelfLift(config.selfAntiMaxHeight);
                     motor.ApplyGravityOverride(config.selfAntiAcceleration, config.selfAntiMaxSpeed, config.gravityDuration);
-                    selfGravity.Stamp();
                 }
             }
             else
@@ -331,7 +363,16 @@ namespace Game.Player
                 target.ApplyOverride(config.gravityDuration, mode, BuildImpulse(mode));
             }
             Game.Audio.SoundPlayer.Play("whoosh", 0.8f);
-            ConsumeCharge();
+
+            // 对自己施放要花更多充能（削弱"自锁飞行"）
+            int cost = target == selfGravity ? selfCost : 1;
+            Debug.Log($"[SelfCast] v4 字段值={selfChargeCost} 是否自锁={target == selfGravity} 消耗={cost} 消耗前充能={charges}");
+            for (int i = 0; i < cost; i++) ConsumeCharge();
+
+            // 自锁后进入冷却，防止反复拿来逃课
+            if (target == selfGravity) selfCastCooldownTimer = selfCastCooldown;
+
+            Debug.Log($"[SelfCast] 消耗后充能={charges} 冷却={selfCastCooldownTimer:0.0}s");
 
             lastCast = target;
             lastCastTimer = config.gravityDuration + targetLockExtra;
@@ -346,7 +387,17 @@ namespace Game.Player
             return true;
         }
 
-        /// <summary>Q：朝身前拉；E：朝身前甩出去。</summary>
+        /// <summary>鼠标当前指向的世界坐标。</summary>
+        private Vector2 PointerWorld()
+        {
+            Camera cam = Camera.main;
+            if (cam == null) return transform.position;
+
+            Vector3 world = cam.ScreenToWorldPoint(new Vector3(lastPointer.x, lastPointer.y, 0f));
+            return new Vector2(world.x, world.y);
+        }
+
+        /// <summary>Q：朝身前拉；E：朝鼠标方向甩出去。</summary>
         private Vector2 BuildImpulse(GravityMode mode)
         {
             float facing = motor != null ? motor.Facing : 1f;
@@ -354,7 +405,20 @@ namespace Game.Player
             if (mode == GravityMode.AntiGravity)
                 return new Vector2(facing * config.antiThrowX, config.antiThrowUp);
 
-            return new Vector2(facing * config.heavyThrowX, config.heavyThrowDown);
+            // E：朝鼠标方向甩出去。
+            // 关键：先把偏移量放大（aimSensitivity），再归一化 —— 这样鼠标不用移很远也能出大角度，
+            // 小窗口下也不会"怎么划都不够"。
+            Vector2 aim = PointerWorld() - (Vector2)transform.position;
+
+            if (aim.magnitude >= aimDeadZone)
+                lastAim = aim.normalized;
+            else
+                aim = lastAim;                       // 鼠标贴脸时保持上次方向，不乱抖
+
+            aim = (aim * aimSensitivity).normalized;
+
+            // 在鼠标方向上再叠一个固定的下砸分量，避免"平推"软绵绵
+            return aim * config.heavyThrowX + new Vector2(0f, config.heavyThrowDown);
         }
 
         private GravityAffected ResolveTarget()
@@ -404,7 +468,7 @@ namespace Game.Player
         /// <summary>按住 F 蓄力，满 1.5 秒进入失重；松开取消。</summary>
         private void UpdateZeroG(PlayerInputData data)
         {
-            if (zeroGCooldownTimer > 0f) zeroGCooldownTimer -= Time.deltaTime;
+            if (zeroGCooldownTimer > 0f) zeroGCooldownTimer -= Time.unscaledDeltaTime;
 
             if (GravityWorld.Instance != null && GravityWorld.Instance.IsZeroG)
             {
@@ -418,7 +482,8 @@ namespace Game.Player
                 return;
             }
 
-            zeroGCharge += Time.deltaTime;
+            // 用真实时间蓄力：锁定慢动作(0.35x)下不会变成"要按 1.4 秒"
+            zeroGCharge += Time.unscaledDeltaTime;
             if (zeroGCharge < config.zeroGChargeTime) return;
 
             zeroGCharge = 0f;

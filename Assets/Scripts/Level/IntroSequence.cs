@@ -36,8 +36,12 @@ namespace Game.Level
             targetX = startX;
         }
 
-        private void Start()
+        private System.Collections.IEnumerator Start()
         {
+            // 封面还开着就先等着，别在背景里把开场播完
+            while (Game.Level.TitleScreen.IsShowing)
+                yield return null;
+
             // 保险：上一局可能留下 timeScale=0（死亡/顿帧），这里强制恢复正常
             if (Time.timeScale < 0.99f)
             {
@@ -55,7 +59,7 @@ namespace Game.Level
             if (found == null)
             {
                 Debug.LogWarning("[IntroSequence] 找不到玩家，跳过开场");
-                return;
+                yield break;
             }
 
             GameObject go = found.gameObject;
@@ -70,7 +74,7 @@ namespace Game.Level
             if (cam == null)
             {
                 Debug.LogWarning("[Intro] 没有 MainCamera，跳过");
-                return;
+                yield break;
             }
 
             // 兜底：如果没配置目标，就走到相机中心右边一点

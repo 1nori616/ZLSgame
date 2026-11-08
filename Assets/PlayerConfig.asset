@@ -25,11 +25,12 @@ MonoBehaviour:
   dashDuration: 0.15
   dashCooldown: 0.5
   gravityDuration: 2
-  gravityCharges: 5
+  gravityCharges: 8
   gravityRechargeTime: 1.2
   cameraFocusDuration: 1.2
   selfAntiAcceleration: 16
-  selfAntiMaxSpeed: 6
+  selfAntiMaxSpeed: 4
+  selfAntiMaxHeight: 5
   castRadius: 3.5
   frontPreference: 0.6
   castLayer:

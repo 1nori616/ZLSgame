@@ -130,6 +130,7 @@ string levelName = Path.GetFileNameWithoutExtension(path);
 
             Vector2 spawnPos = new Vector2(width * 0.5f, height * 0.5f);
             bool hasGoal = false;
+            string nextSceneName = GetNextSceneName(levelName);
 
             for (int row = 0; row < height; row++)
             {
@@ -198,7 +199,13 @@ string levelName = Path.GetFileNameWithoutExtension(path);
                             break;
 
                         case Goal:
-                            Place(goalPrefab, cellCenter, "goal");
+                            GameObject goalGo = Place(goalPrefab, cellCenter, "goal");
+                            if (goalGo != null)
+                            {
+                                var exit = goalGo.GetComponent<Game.Level.LevelExit>();
+                                if (exit == null) exit = goalGo.AddComponent<Game.Level.LevelExit>();
+                                exit.SetNextScene(nextSceneName);
+                            }
                             hasGoal = true;
                             break;
                     }
@@ -229,8 +236,15 @@ string levelName = Path.GetFileNameWithoutExtension(path);
             CreateHints(levelPath, height);
 
             // ---- 背景 + 舱门 ----
-            CreateBackground(cam, width, height, spawnPos);
+            CreateBackground(cam, width, height, spawnPos, levelName);
             CreateDoors(spawnPos, width, height, lines);
+
+            // ---- 开始界面（只有第一个关卡需要）----
+            if (IsFirstLevel(levelName))
+            {
+                var titleGo = new GameObject("TitleScreen");
+                titleGo.AddComponent<Game.Level.TitleScreen>();
+            }
 
             // ---- 连击计数 ----
             var comboGo = new GameObject("ComboCounter");
@@ -257,9 +271,32 @@ string levelName = Path.GetFileNameWithoutExtension(path);
         }
 
         /// <summary>星空背景 + 视差。</summary>
-        private static void CreateBackground(Camera cam, int width, int height, Vector2 spawnPos)
+        private static void CreateBackground(Camera cam, int width, int height, Vector2 spawnPos, string levelName)
         {
-            Sprite bg = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/Sprites/BG_Space.png");
+            // 优先用"本关专用背景" BG_关卡名.png，没有再退回通用星空
+            // 背景变体：BG_关卡.png / BG_关卡_B.png / BG_关卡_C.png，平铺时轮流使用
+            var bgVariants = new List<Sprite>();
+            Sprite first = AssetDatabase.LoadAssetAtPath<Sprite>($"Assets/Art/Sprites/BG_{levelName}.png");
+            if (first == null)
+                first = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/Sprites/BG_Space.png");
+
+            if (first != null)
+            {
+                bgVariants.Add(first);
+                foreach (string suffix in new[] { "_B", "_C", "_D" })
+                {
+                    Sprite extra = AssetDatabase.LoadAssetAtPath<Sprite>($"Assets/Art/Sprites/BG_{levelName}{suffix}.png");
+                    if (extra != null) bgVariants.Add(extra);
+                }
+            }
+
+            if (bgVariants.Count == 0)
+            {
+                Debug.LogWarning("[LevelBuilder] 找不到任何背景图");
+                return;
+            }
+
+            Sprite bg = bgVariants[0];
             if (bg == null)
             {
                 Debug.LogWarning("[LevelBuilder] 找不到背景图 Assets/Art/Sprites/BG_Space.png");
@@ -288,7 +325,7 @@ string levelName = Path.GetFileNameWithoutExtension(path);
                 go.transform.localPosition = new Vector3((i - count / 2) * scaledW, 0f, 0f);
 
                 var sr = go.AddComponent<SpriteRenderer>();
-                sr.sprite = bg;
+                sr.sprite = bgVariants[i % bgVariants.Count];
                 sr.sortingOrder = -100;
             }
 
@@ -296,6 +333,41 @@ string levelName = Path.GetFileNameWithoutExtension(path);
         }
 
         /// <summary>起点舱门（开→关）和终点舱门（关→开）。</summary>
+        /// <summary>某个关卡是不是 level_order.txt 里的第一个（需要开始界面的那个）。</summary>
+        private static bool IsFirstLevel(string levelName)
+        {
+            string orderPath = "Assets/Levels/level_order.txt";
+            if (!System.IO.File.Exists(orderPath)) return false;
+
+            foreach (string raw in System.IO.File.ReadAllLines(orderPath))
+            {
+                string name = raw.Trim();
+                if (name.Length == 0) continue;
+                return name == levelName;
+            }
+            return false;
+        }
+
+        /// <summary>从 Assets/Levels/level_order.txt 读关卡顺序，算出下一关场景名。</summary>
+        private static string GetNextSceneName(string levelName)
+        {
+            string orderPath = "Assets/Levels/level_order.txt";
+            if (!System.IO.File.Exists(orderPath)) return "";
+
+            string[] order = System.IO.File.ReadAllLines(orderPath);
+            for (int i = 0; i < order.Length; i++)
+            {
+                if (order[i].Trim() != levelName) continue;
+                for (int k = i + 1; k < order.Length; k++)
+                {
+                    string next = order[k].Trim();
+                    if (next.Length > 0) return next;
+                }
+                return "";
+            }
+            return "";
+        }
+
         private static void CreateDoors(Vector2 spawnPos, int width, int height, string[] lines)
         {
             Sprite startOpen = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/Sprites/Door_Start_Open.png");
@@ -380,12 +452,12 @@ string levelName = Path.GetFileNameWithoutExtension(path);
             Debug.Log($"[LevelBuilder] 生成 {count} 条浮动提示");
         }
 
-        private static void Place(GameObject prefab, Vector3 pos, string label)
+        private static GameObject Place(GameObject prefab, Vector3 pos, string label)
         {
             if (prefab == null)
             {
                 Debug.LogWarning($"[LevelBuilder] 缺少预制体：{label}");
-                return;
+                return null;
             }
 
             var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
@@ -394,6 +466,8 @@ string levelName = Path.GetFileNameWithoutExtension(path);
             // 敌人/箱子被重力甩飞时不要立刻判定出界传送回去
             var bounds = go.GetComponent<Game.Combat.OutOfBounds>();
             if (bounds != null) bounds.Configure(-4f, currentHeight + 20f);
+
+            return go;
         }
 
         private static Tilemap CreateTilemap(Transform parent, string name, bool solid)
@@ -463,15 +537,37 @@ string levelName = Path.GetFileNameWithoutExtension(path);
             return AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabFolder}/{name}.prefab");
         }
 
+        /// <summary>
+        /// 按 Assets/Levels/level_order.txt 的顺序重建打包场景列表，
+        /// 保证"教学关永远是第一个启动场景"。
+        /// </summary>
         private static void AddSceneToBuild(string scenePath)
         {
-            var scenes = new List<EditorBuildSettingsScene>(EditorBuildSettings.scenes);
-            for (int i = 0; i < scenes.Count; i++)
-                if (scenes[i].path == scenePath) return;
+            string orderPath = "Assets/Levels/level_order.txt";
+            var ordered = new List<EditorBuildSettingsScene>();
 
-            // 新关卡插到第一位（方便直接 Play）
-            scenes.Insert(0, new EditorBuildSettingsScene(scenePath, true));
-            EditorBuildSettings.scenes = scenes.ToArray();
+            if (System.IO.File.Exists(orderPath))
+            {
+                foreach (string raw in System.IO.File.ReadAllLines(orderPath))
+                {
+                    string name = raw.Trim();
+                    if (name.Length == 0) continue;
+
+                    string path = $"Assets/Scenes/Levels/{name}.unity";
+                    if (System.IO.File.Exists(path))
+                        ordered.Add(new EditorBuildSettingsScene(path, true));
+                }
+            }
+
+            // 顺序表里没有当前关卡就补在最前面（避免漏掉）
+            bool contains = false;
+            for (int i = 0; i < ordered.Count; i++)
+                if (ordered[i].path == scenePath) { contains = true; break; }
+
+            if (!contains)
+                ordered.Insert(0, new EditorBuildSettingsScene(scenePath, true));
+
+            EditorBuildSettings.scenes = ordered.ToArray();
         }
     }
 }

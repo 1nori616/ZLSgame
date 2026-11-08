@@ -25,11 +25,17 @@ namespace Game.Player
         private float facing = 1f;
 
         private float knockbackTimer;
+
+        [Tooltip("自己飘起来时的横向操控倍率")]
+        [Range(0.1f, 1f)]
+        [SerializeField] private float selfFloatControlScale = 0.5f;
         private float speedMultiplier = 1f;
 
         private float gravityOverrideTimer;
         private float gravityOverrideAccel;
         private float gravityOverrideMaxSpeed;
+        private float selfLiftMaxHeight;   // >0 时限制"自锁上浮"的最大高度
+        private float selfLiftStartY;
 
 
         public bool IsGrounded { get; private set; }
@@ -67,7 +73,11 @@ namespace Game.Player
 
             if (dashCooldownTimer > 0f) dashCooldownTimer -= Time.fixedDeltaTime;
             if (knockbackTimer > 0f) knockbackTimer -= Time.fixedDeltaTime;
-            if (gravityOverrideTimer > 0f) gravityOverrideTimer -= Time.fixedDeltaTime;
+            if (gravityOverrideTimer > 0f)
+            {
+                gravityOverrideTimer -= Time.fixedDeltaTime;
+                if (gravityOverrideTimer <= 0f) selfLiftMaxHeight = 0f;   // 覆盖结束，取消高度限制
+            }
 
             if (dashTimer > 0f)
             {
@@ -131,6 +141,14 @@ namespace Game.Player
                 -gravityOverrideMaxSpeed,
                 gravityOverrideMaxSpeed);
 
+            // 自锁上浮：超过允许高度就不再往上
+            if (selfLiftMaxHeight > 0f && accel > 0f)
+            {
+                float nextY = rb.position.y + vy * Time.fixedDeltaTime;
+                if (nextY - selfLiftStartY > selfLiftMaxHeight)
+                    vy = Mathf.Min(vy, 0f);
+            }
+
             rb.velocity = new Vector2(rb.velocity.x, vy);
         }
 
@@ -140,7 +158,10 @@ namespace Game.Player
                 ? config.zeroGControlScale
                 : 1f;
 
-            float targetSpeed = input * config.moveSpeed * speedMultiplier * scale;
+            // 自己飘起来的时候横向操控减半，避免"飘着横穿地图"
+            float selfFloat = IsGravityOverridden ? selfFloatControlScale : 1f;
+
+            float targetSpeed = input * config.moveSpeed * speedMultiplier * scale * selfFloat;
             float rate = Mathf.Approximately(input, 0f) ? config.deceleration : config.acceleration;
             float newX = Mathf.MoveTowards(rb.velocity.x, targetSpeed, rate * Time.fixedDeltaTime);
             rb.velocity = new Vector2(newX, rb.velocity.y);
@@ -230,6 +251,13 @@ namespace Game.Player
         public void SetSpeedMultiplier(float multiplier)
         {
             speedMultiplier = Mathf.Clamp(multiplier, 0.1f, 10f);
+        }
+
+        /// <summary>开始一次"自锁上浮"，限制最高能升多少。</summary>
+        public void StartSelfLift(float maxHeight)
+        {
+            selfLiftStartY = rb != null ? rb.position.y : transform.position.y;
+            selfLiftMaxHeight = Mathf.Max(0.1f, maxHeight);
         }
 
         public void ApplyGravityOverride(float acceleration, float maxSpeed, float duration)
